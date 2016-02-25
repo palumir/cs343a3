@@ -1,0 +1,26 @@
+#ifndef BINDER_H
+#define BINDER_H
+
+#include "string.h"
+
+using namespace std;
+
+struct server_info {
+    int server_socket;
+    string server_name;
+    int port_num;
+};
+
+struct function_info {
+    string function_name;
+    int* argTypes;
+};
+
+int tcpInit(int *n_port, int* socketfd);
+int getMsgLength(int socketfd);
+int getMsgType(int socketfd);
+void handle_loc_request(int socketfd, int msg_len);
+void handle_register_request(int socketfd, int msg_len);
+
+
+#endif
