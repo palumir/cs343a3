@@ -14,13 +14,16 @@ struct server_info {
 struct function_info {
     string function_name;
     int* argTypes;
+    int numArgs;
 };
 
 int tcpInit(int *n_port, int* socketfd);
 int getMsgLength(int socketfd);
 int getMsgType(int socketfd);
+bool sameArgTypes(int a, int b);
 void handle_loc_request(int socketfd, int msg_len);
 void handle_register_request(int socketfd, int msg_len);
+void handle_terminate_request(int socketfd);
 
 
 #endif
