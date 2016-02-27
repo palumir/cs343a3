@@ -9,6 +9,7 @@
 #include <iostream>
 #include <arpa/inet.h> 
 #include "constant.h"
+#include "rpc.h"
 using namespace std;
 
 pthread_mutex_t lock;
@@ -103,5 +104,25 @@ int rpcInit() {
 	}
 	
 	// No errors. Return success.
+	return 0;
+}
+
+int rpcCall(char* name, int* argTypes, void** args) {
+	return 0;
+}
+
+int rpcCacheCall(char* name, int* argTypes, void** args) {
+	return 0;
+}
+
+int rpcRegister(char* name, int* argTypes, skeleton f) {
+	return 0;
+}
+
+int rpcExecute() {
+	return 0;
+}
+
+int rpcTerminate() {
 	return 0;
 }
