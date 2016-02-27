@@ -8,6 +8,7 @@
 #include <string.h>
 #include <iostream>
 #include <arpa/inet.h> 
+#include "constant.h"
 using namespace std;
 
 pthread_mutex_t lock;
@@ -79,26 +80,26 @@ int rpcInit() {
 	char * address = getenv("BINDER_ADDRESS");
 	if(address==NULL) {
 		cerr << "Couldn't get binder address: " << strerror(errno) << endl;
-		return -1;
+		return ADDRESS_ERROR;
 	}
 	char * port = getenv("BINDER_PORT");
 	if(port==NULL) {
 		cerr << "Couldn't get port address: " << strerror(errno) << endl;
-		return -2;
+		return PORT_ERROR;
 	}
 	
 	// Connect to binder.
 	binderFD = connectToSocket(address, port);
 	if(binderFD < 0) {
 		cerr << "Couldn't connect to binder." << endl;
-		return -3;
+		return CONNECT_BINDER_ERROR;
 	}
 	
 	// Create a socket that accepts client connections.
 	listenFD = listenToNewSocket();
 	if(listenFD < 0) {
 		cerr << "Couldn't listen on new socket for client connections" << endl;
-		return -4;
+		return LISTEN_CLIENTS_SOCKET_ERROR;
 	}
 	
 	// No errors. Return success.

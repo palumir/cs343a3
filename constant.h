@@ -26,5 +26,11 @@
 //Terminate Messages
 #define TERMINATE 13
 
+//RPC Messages
+#define ADDRESS_ERROR -1
+#define PORT_ERROR -2
+#define CONNECT_BINDER_ERROR -3
+#define LISTEN_CLIENTS_SOCKET_ERROR -4
+
 
 #endif
