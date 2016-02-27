@@ -5,12 +5,13 @@
 //length
 #define HOSTNAME_LENGTH 32
 #define PORT_LENGTH 4
-#define NAME_LENGTH 32
+#define NAME_LENGTH 65
 
 //Server/Binder Message
 #define REGISTER 10
 #define REGISTER_SUCCESS 0
 #define REGISTER_FAILURE -1
+#define DUPLICATE_REGISTER 1
 
 //Client/Binder Message
 #define LOC_REQUEST 11
