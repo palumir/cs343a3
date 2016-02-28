@@ -189,5 +189,15 @@ int rpcExecute() {
 }
 
 int rpcTerminate() {
+	
+	// Terminate if we are connected.
+	if(binderFD > 0) {
+		cerr << "Couldn't connect to binder." << endl;
+		int terminate = TERMINATE;
+		send(binderFD, &terminate, sizeof(terminate), 0);
+		return 0;
+	}
+	
+	// Don't explode if we're not connected.
 	return 0;
 }
