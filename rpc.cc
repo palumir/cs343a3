@@ -12,6 +12,13 @@
 #include "rpc.h"
 using namespace std;
 
+// Registered functions.
+int numRegistered = 0;
+skeleton registeredFunctions[256];
+string functionNames[256];
+int[] argTypesList[256];
+
+
 pthread_mutex_t lock;
 int binderFD = -1;
 int listenFD = -1;
@@ -107,15 +114,73 @@ int rpcInit() {
 	return 0;
 }
 
+int rpcRegister(char* name, int* argTypes, skeleton f) {
+	
+	// Send length of argTypes.
+	int argTypesLen = argTypes.length();
+	send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
+	
+	// Send type of request.
+	int type = REGISTER;
+	send(binderFD, &type, sizeof(type), 0);
+	
+	// Send hostname.
+	char hostName[HOSTNAME_LENGTH];
+	gethostname(hostName, HOSTNAME_LENGTH);
+	string host = hostName;
+	send(binderFD, &host, HOSTNAME_LENGTH, 0);
+	
+	// Send port.
+	struct sockaddr_in sin;
+    socklen_t sinlen = sizeof(sin);
+    getsockname(listenFD, (struct sockaddr *)&sin, &len);
+    int listenPort = ntohs(sin.sin_port);
+	send(binderFD, &listenPort, PORT_LENGTH, 0);
+	
+	// Send function name.
+	string functionName = name;
+	send(binderFD, &functionName, NAME_LENGTH, 0);
+	
+	// Send argTypes.
+	send(binderFD, &argTypes, msgLength, 0);
+	
+	// Receive from binder success or failure.
+	int retCode;
+	recv(binderFD, &retCode, sizeof(retCode), 0);
+	
+	// We failed for some reason.
+	if(retCode == REGISTER_FAILURE) {
+		cerr << "Failure registering function: " << name << endl;
+		return REGISTER_FAILURE;
+	}
+	
+	// Register success. Do stuff.
+	else if(retCode == REGISTER_SUCCESS) {
+		registeredFunctions[numRegistered] = f;
+		argTypesList[numRegistered] = argTypes;
+		functionNames[numRegistered] = name;
+		numRegistered++;
+		return REGISTER_SUCCESS;
+	}
+	
+	// Do nothing, it's already registered.
+	else if(retCode == DUPLICATE_REGISTER) {
+		return DUPLICATE_REGISTER;
+	}
+	
+	// What are you sending me, yo? ;)
+	else {
+		return TYPE_ERROR;
+	}
+	
+	return 0;
+}
+
 int rpcCall(char* name, int* argTypes, void** args) {
 	return 0;
 }
 
 int rpcCacheCall(char* name, int* argTypes, void** args) {
-	return 0;
-}
-
-int rpcRegister(char* name, int* argTypes, skeleton f) {
 	return 0;
 }
 

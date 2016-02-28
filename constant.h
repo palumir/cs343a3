@@ -1,6 +1,8 @@
 #ifndef constant_h
 #define constant_h
 
+//Type error
+#define TYPE_ERROR -322
 
 //length
 #define HOSTNAME_LENGTH 32
