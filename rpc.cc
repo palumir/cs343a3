@@ -177,6 +177,54 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 }
 
 int rpcCall(char* name, int* argTypes, void** args) {
+	if(binderFD > 0) {
+		// Send length of argTypes.
+		int argTypesLen = argTypes.length();
+		send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
+		
+		// Send type of request.
+		int type = LOC_REQUEST;
+		send(binderFD, &type, sizeof(type), 0);
+		
+		// Send function name.
+		string functionName = name;
+		send(binderFD, &functionName, NAME_LENGTH, 0);
+		
+		// Send argTypes.
+		send(binderFD, &argTypes, msgLength, 0);
+		
+		// Receive from binder success or failure.
+		int retCode;
+		recv(binderFD, &retCode, sizeof(retCode), 0);
+		
+		if(retCode == LOC_SUCCESS) {
+			
+			// Receive server name.
+			char * serverName = new char[NAME_LENGTH];
+			ret = recv(x, serverName, NAME_LENGTH, 0);
+			
+			// Receive server port.
+			int serverPort;
+			recv(binderFD, &serverPort, PORT_LENGTH, 0);
+			
+			// Get the server's socket file descriptor.
+			int serverFD = connectToSocket(serverName, itoa(serverPort));
+			
+			// SEND EXECUTE REQUEST TO SERVER WIP (WORK IN PROGRESS)
+			int exRetCode = 0; // SendExecuteRequest WIP
+			
+			return exRetCode;
+		}
+		
+		if(retCode == LOC_FAILURE) {
+			cerr << "rpcCall location failure." << endl;
+			return LOC_FAILURE;
+		}
+		
+		else {
+			return TYPE_ERROR;
+		}
+	}
 	return 0;
 }
 
