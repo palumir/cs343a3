@@ -14,7 +14,7 @@ using namespace std;
 
 vector<int> servers_socket;
 vector<server_info> all_servers;
-map<server_info, vector<function_info>> binder_database;
+map<server_info, vector<function_info>, Comparer> binder_database;
 bool all_close = false;
 
 int tcpInit(int *n_port, int* socketfd) {
@@ -138,7 +138,7 @@ void handle_loc_request(int socketfd, int msg_len) {
     //for round robin
     vector<string> all_valid_server; //all servers that owns the function
   
-    for (map<server_info, vector<function_info>>::iterator it = binder_database.begin();
+    for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
          it != binder_database.end(); ++it) {
         vector<function_info> temp = it->second;
         for (vector<function_info>::iterator i = temp.begin();
@@ -273,7 +273,7 @@ void handle_register_request(int socketfd, int msg_len) {
     server_info server_location;
     bool server_exist = false;
     bool function_exist = false;
-    for (map<server_info, vector<function_info>>::iterator it = binder_database.begin();
+    for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
          it != binder_database.end(); ++it) {
         //found server
         if(it->first.server_name == string(server_identifier)) {
@@ -323,6 +323,8 @@ void handle_register_request(int socketfd, int msg_len) {
       //add to server list
       all_servers.push_back(server_location);
       servers_socket.push_back(socketfd);
+      vector<function_info> new_list_of_function;
+      binder_database.insert(make_pair(server_location, new_list_of_function));
     }
     
     function_info ftn;
@@ -341,7 +343,7 @@ void handle_register_request(int socketfd, int msg_len) {
     
     //see if the function registration has been successful
     bool success = false;
-    map<server_info, vector<function_info>>::iterator server_in_DB;
+    map<server_info, vector<function_info> >::iterator server_in_DB;
     server_in_DB = binder_database.find(server_location);
     
     if(server_in_DB != binder_database.end()) {
@@ -399,8 +401,8 @@ void handle_terminate_request(int socketfd) {
          //send terminate message
          int socket_end = *i;
          int terminate = TERMINATE;
-         int send_success_message = send(socket_end, &terminate, sizeof(terminate), 0);
-         if (send_success_message < 0) {
+         int terminate_message = send(socket_end, &terminate, sizeof(terminate), 0);
+         if (terminate_message < 0) {
              cerr << "Error: fail to send terminate message when handle the terminate_req message" << endl;
          }
     }
@@ -511,7 +513,7 @@ int main(int argc, const char* argv[]) {
               
               
               //remove entry of closed server from database
-              for (map<server_info, vector<function_info>>::iterator it = binder_database.begin();
+              for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
                    it != binder_database.end(); ++it) {
                    if (it->first.server_socket == i) {
                       binder_database.erase(it);
