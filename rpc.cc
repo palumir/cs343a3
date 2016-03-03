@@ -384,7 +384,6 @@ int rpcExecute() {
                             handle_execute_request(i, msg_len);
                             break;
                     }
-
                 }
             }
         }
