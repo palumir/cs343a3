@@ -18,8 +18,6 @@ skeleton registeredFunctions[256];
 string functionNames[256];
 int[] argTypesList[256];
 
-
-pthread_mutex_t lock;
 int binderFD = -1;
 int listenFD = -1;
 
@@ -103,6 +101,21 @@ int getMsgType(int socketfd) {
     return msg_type;
 }
 
+void runFunction(int functionNumber, void *args, int socketfd) {
+	
+	// Run the function.
+	skeleton s = registeredFunctions[functionNumber];
+	int retVal = s(argTypesList[functionNumber], args);
+	
+	// Success
+	if(retVal == 0) {
+		send(socketfd, EXECUTE_SUCCESS, sizeof(int), 0);
+	}
+	else {
+		send(socketfd, EXECUTE_FAILURE, sizeof(int), 0);
+	}
+}
+
 void handle_execute_request(int socketfd, int msg_len) {
     //EXECUTE, name, argTypes, args
     
@@ -146,18 +159,32 @@ void handle_execute_request(int socketfd, int msg_len) {
         //put arg into arg array
         args[i] = arg;
     }
-    //compare function names
-    //compare argTypes of the function
-    //compare args of the function
+	
+    // Check if the function is registered in our DB and then run it if it is.
+	int x = 0;
+	int foundFunction = -1;
+	while(x < numRegistered) {
+		if(function_name == functionNames[x]) {
+			foundFunction = x;
+			break;
+		}
+		x++;
+	}
+
+	// Found the function, execute it in a new pthread.
+	if(foundFunction != -1) {
+		pthread_t runThread;
+		void ** threadArgs = new void*[3];
+		threadArgs[0] = (void*)foundFunction;
+		threadArgs[1] = (void*)args;
+		threadArgs[2] = (void*)socketfd;
+		pthread_create(&runThread, NULL, &runFunction, (void*)threadArgs);
+	}
     
-    //if found the function is in database, create a thread and execute it
 }
 
 
 int rpcInit() {
-	
-	// Initialize our lock.
-	pthread_mutex_init(&lock, NULL);
 	
 	// Retrieve binder info
 	char * address = getenv("BINDER_ADDRESS");
@@ -276,7 +303,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			
 			// Receive server name.
 			char * serverName = new char[NAME_LENGTH];
-			ret = recv(x, serverName, NAME_LENGTH, 0);
+			ret = recv(binderFD, serverName, NAME_LENGTH, 0);
 			
 			// Receive server port.
 			int serverPort;
@@ -285,8 +312,21 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			// Get the server's socket file descriptor.
 			int serverFD = connectToSocket(serverName, itoa(serverPort));
 			
-			// SEND EXECUTE REQUEST TO SERVER WIP (WORK IN PROGRESS)
-			int exRetCode = 0; // SendExecuteRequest WIP
+			// Notify we are sending an execute request.
+			send(serverFD, EXECUTE_REQUEST, sizeof(int), 0);
+			
+			// Send name
+			send(serverFD, &name, sizeof(NAME_LENGTH), 0);
+			
+			// Send argTypes
+			send(serverFD, &argTypes, sizeof(argTypes), 0);
+			
+			// Send args
+			send(serverFD, &args, sizeof(args), 0);
+			
+			// Receive the return value.
+			int exRetCode;
+			ret = recv(serverFD, &exRetCode, sizeof(int), 0);
 			
 			return exRetCode;
 		}
