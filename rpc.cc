@@ -79,6 +79,81 @@ int connectToSocket(char *address, char* port) {
 	return socketFD;
 }
 
+int getMsgLength(int socketfd) {
+    int msg_len;
+    
+    int length_num = recv(socketfd, &msg_len, sizeof(msg_len), 0);
+    if(length_num < 0) {
+        cerr << "Error: fail to receive message length" << endl;
+        return -1;
+    }
+    
+    return msg_len;
+}
+
+int getMsgType(int socketfd) {
+    int msg_type;
+    
+    int type_num = recv(socketfd, &msg_type, sizeof(msg_type), 0);
+    if(type_num < 0) {
+        cerr << "Error: fail to receive message type" << endl;
+        return -1;
+    }
+    
+    return msg_type;
+}
+
+void handle_execute_request(int socketfd, int msg_len) {
+    //EXECUTE, name, argTypes, args
+    
+    //get function name
+    char function_name[NAME_LENGTH];
+    int recv_function_name_num = recv(socketfd, function_name, NAME_LENGTH, 0);
+    if(recv_function_name_num < 0) {
+        cerr << "Error: fail to receive name part of loc_requst message" << endl;
+        //return -1;
+    }
+    
+    //get argTypes
+    int msg_len_int = msg_len - NAME_LENGTH;
+    int argType[msg_len_int / 4];// divide by 4 since the size of each int in argTypes is 4 bytes
+    int recv_argTypes_num = recv(socketfd, argType, msg_len_int, 0);
+    if(recv_argTypes_num < 0) {
+        cerr << "Error: fail to receive argTypes part of loc_requst message" << endl;
+        //return -1;
+    }
+
+    //get args
+    int num_args = msg_len_int / 4 - 1; // the size of argTypes is 1 greater than the size of args
+    void** args = new void*[num_args];
+    for (int i = 0; i == num_args; ++i) {
+        //recv the size of the arg
+        int size_of_arg;
+        int recv_size_arg = recv(socketfd, &size_of_arg, sizeof(size_of_arg), 0);
+        if(recv_size_arg < 0) {
+            cerr << "Error: fail to receive size of arg" << endl;
+            //return -1;
+        }
+
+        //recv the arg
+        void *arg = (void *)malloc(size_of_arg); // c++ is not allowed to use new for void so use malloc
+        int recv_arg = recv(socketfd, arg, size_of_arg, 0);
+        if(recv_arg < 0) {
+            cerr << "Error: fail to receive arg" << endl;
+            //return -1;
+        }
+        
+        //put arg into arg array
+        args[i] = arg;
+    }
+    //compare function names
+    //compare argTypes of the function
+    //compare args of the function
+    
+    //if found the function is in database, create a thread and execute it
+}
+
+
 int rpcInit() {
 	
 	// Initialize our lock.
@@ -233,7 +308,91 @@ int rpcCacheCall(char* name, int* argTypes, void** args) {
 }
 
 int rpcExecute() {
-	return 0;
+	//wait for connection from client (unbounded)
+    int listen_num = listen(listenFD, SOMAXCONN);
+    if (listen_num != 0) {
+        close(listenFD);
+        cerr << "Error: fail to listen to server" << endl;
+        return -1;
+    }
+    
+    
+    //select
+    //ref: http://www.lowtek.com/sockets/select.html
+    //ref: http://www.cs.toronto.edu/~krueger/csc209h/f05/lectures/Week11-Select.pdf
+    //ref: https://en.wikipedia.org/wiki/Select_(Unix)
+    //ref: http://www.linuxhowtos.org/C_C++/socket.htm
+    fd_set rfds;
+    fd_set rset; //descriptor sets
+    FD_ZERO(&rfds);
+    FD_ZERO(&rset);
+    FD_SET(listenFD, &rset);
+    
+    int highsock = listenFD;
+    int readsocks;
+    
+    while (1) {
+        memcpy(&rfds, &rset, sizeof(rset));
+        readsocks = select(highsock + 1, &rfds, (fd_set *) 0, (fd_set *) 0, NULL);
+        
+        if(readsocks < 0) {
+            cerr << "failed to select" << endl;
+            //return -1;
+        }
+        
+        for(int i = 0; i < highsock + 1; ++i) {
+            if(FD_ISSET(i, &rfds)) {
+                //client tries to connect
+                if(i == listenFD) {
+                    struct sockaddr_in cli_addr;
+                    socklen_t clilen = sizeof(cli_addr);
+                    int connectionfd = accept(listenFD, (struct sockaddr *) &cli_addr, &clilen);
+                    if(connectionfd < 0) {
+                        cerr << "failed to accept connection from server" << endl;
+                    }
+                    
+                    cerr << "connected to client" << endl;
+                    //update the descriptor sets
+                    FD_SET(connectionfd, &rset);
+                    if(connectionfd > highsock) {
+                        highsock = connectionfd;
+                    }
+                }
+                //handle request
+                else {
+                    //get message length (4 bytes)
+                    int msg_len = getMsgLength(i);
+                    if (msg_len == -1) {
+                        return -1;
+                    }
+                    
+                    //msg_len == 0 means client tries to end connection
+                    if(msg_len == 0) {
+                        FD_CLR(i, &rset);
+                        close(i);
+                        continue;
+                    }
+                    
+                    //get message type (4 bytes)
+                    int msg_type = getMsgType(i);
+                    if (msg_type == -1) {
+                        return -1;
+                    }
+                    
+                    switch (msg_type) {
+                            case EXECUTE:
+                            handle_execute_request(i, msg_len);
+                            break;
+                    }
+
+                }
+            }
+        }
+    }
+       
+    //close all the connections
+      
+    return 0;
 }
 
 int rpcTerminate() {
