@@ -16,7 +16,7 @@ using namespace std;
 int numRegistered = 0;
 skeleton registeredFunctions[256];
 string functionNames[256];
-int[] argTypesList[256];
+int* argTypesList[256];
 
 int binderFD = -1;
 int listenFD = -1;
@@ -54,11 +54,11 @@ int listenToNewSocket() {
 	return socketFD;
 }
 
-int connectToSocket(char *address, char* port) {
+int connectToSocket(char *address, int port) {
 	int socketFD;
 	struct sockaddr_in serverAddress;
 	struct hostent *server;
-	int portNum = atoi(port);
+	int portNum = port;
 	
 	// Connect to the socket
     socketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -70,7 +70,7 @@ int connectToSocket(char *address, char* port) {
 	bcopy((char*)server->h_addr,(char*)&serverAddress.sin_addr.s_addr,server->h_length);
 	serverAddress.sin_port = htons(portNum);
 	if(connect(socketFD,(struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1) {
-		cerr << "Connected failed: " << strerror(errno) << endl;
+		cerr << "Connected failed." << endl;
 	}
 	
 	// Return descriptor.
@@ -101,7 +101,13 @@ int getMsgType(int socketfd) {
     return msg_type;
 }
 
-void runFunction(int functionNumber, void *args, int socketfd) {
+void * runFunction(void *threadArgs) {
+	
+	// Cast all the arguments
+	void ** castArgs = (void**)threadArgs;
+	int functionNumber = *((int*)(&castArgs[0]));
+	void** args = (void**)castArgs[1];
+	int socketfd = *((int*)(&castArgs[2]));
 	
 	// Run the function.
 	skeleton s = registeredFunctions[functionNumber];
@@ -109,10 +115,12 @@ void runFunction(int functionNumber, void *args, int socketfd) {
 	
 	// Success
 	if(retVal == 0) {
-		send(socketfd, EXECUTE_SUCCESS, sizeof(int), 0);
+		int exSucc = EXECUTE_SUCCESS;
+		send(socketfd, &exSucc, sizeof(int), 0);
 	}
 	else {
-		send(socketfd, EXECUTE_FAILURE, sizeof(int), 0);
+		int exFail = EXECUTE_FAILURE;
+		send(socketfd, &exFail, sizeof(int), 0);
 	}
 }
 
@@ -174,10 +182,12 @@ void handle_execute_request(int socketfd, int msg_len) {
 	// Found the function, execute it in a new pthread.
 	if(foundFunction != -1) {
 		pthread_t runThread;
+		int * foundFunctionThread = new int(foundFunction);
+		int * socketFDThread = new int(socketfd);
 		void ** threadArgs = new void*[3];
-		threadArgs[0] = (void*)foundFunction;
-		threadArgs[1] = (void*)args;
-		threadArgs[2] = (void*)socketfd;
+		threadArgs[0] = (void*)foundFunctionThread;
+		threadArgs[1] = args;
+		threadArgs[2] = (void*)socketFDThread;
 		pthread_create(&runThread, NULL, &runFunction, (void*)threadArgs);
 	}
     
@@ -189,17 +199,17 @@ int rpcInit() {
 	// Retrieve binder info
 	char * address = getenv("BINDER_ADDRESS");
 	if(address==NULL) {
-		cerr << "Couldn't get binder address: " << strerror(errno) << endl;
+		cerr << "Couldn't get binder address: " << endl;
 		return ADDRESS_ERROR;
 	}
 	char * port = getenv("BINDER_PORT");
 	if(port==NULL) {
-		cerr << "Couldn't get port address: " << strerror(errno) << endl;
+		cerr << "Couldn't get port address: " << endl;
 		return PORT_ERROR;
 	}
 	
 	// Connect to binder.
-	binderFD = connectToSocket(address, port);
+	binderFD = connectToSocket(address, atoi(port));
 	if(binderFD < 0) {
 		cerr << "Couldn't connect to binder." << endl;
 		return CONNECT_BINDER_ERROR;
@@ -219,7 +229,7 @@ int rpcInit() {
 int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	// Send length of argTypes.
-	int argTypesLen = argTypes.length();
+	int argTypesLen = sizeof(argTypes)/sizeof(int);
 	send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
 	
 	// Send type of request.
@@ -235,7 +245,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 	// Send port.
 	struct sockaddr_in sin;
     socklen_t sinlen = sizeof(sin);
-    getsockname(listenFD, (struct sockaddr *)&sin, &len);
+    getsockname(listenFD, (struct sockaddr *)&sin, &sinlen);
     int listenPort = ntohs(sin.sin_port);
 	send(binderFD, &listenPort, PORT_LENGTH, 0);
 	
@@ -244,7 +254,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 	send(binderFD, &functionName, NAME_LENGTH, 0);
 	
 	// Send argTypes.
-	send(binderFD, &argTypes, msgLength, 0);
+	send(binderFD, &argTypes, argTypesLen, 0);
 	
 	// Receive from binder success or failure.
 	int retCode;
@@ -281,7 +291,7 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 int rpcCall(char* name, int* argTypes, void** args) {
 	if(binderFD > 0) {
 		// Send length of argTypes.
-		int argTypesLen = argTypes.length();
+		int argTypesLen = sizeof(argTypes)/sizeof(int);
 		send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
 		
 		// Send type of request.
@@ -293,7 +303,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
 		send(binderFD, &functionName, NAME_LENGTH, 0);
 		
 		// Send argTypes.
-		send(binderFD, &argTypes, msgLength, 0);
+		send(binderFD, &argTypes, argTypesLen, 0);
 		
 		// Receive from binder success or failure.
 		int retCode;
@@ -303,17 +313,18 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			
 			// Receive server name.
 			char * serverName = new char[NAME_LENGTH];
-			ret = recv(binderFD, serverName, NAME_LENGTH, 0);
+			recv(binderFD, serverName, NAME_LENGTH, 0);
 			
 			// Receive server port.
 			int serverPort;
 			recv(binderFD, &serverPort, PORT_LENGTH, 0);
 			
 			// Get the server's socket file descriptor.
-			int serverFD = connectToSocket(serverName, itoa(serverPort));
+			int serverFD = connectToSocket(serverName, serverPort);
 			
 			// Notify we are sending an execute request.
-			send(serverFD, EXECUTE_REQUEST, sizeof(int), 0);
+			int execute = EXECUTE;
+			send(serverFD, &execute, sizeof(int), 0);
 			
 			// Send name
 			send(serverFD, &name, sizeof(NAME_LENGTH), 0);
@@ -326,7 +337,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			
 			// Receive the return value.
 			int exRetCode;
-			ret = recv(serverFD, &exRetCode, sizeof(int), 0);
+			recv(serverFD, &exRetCode, sizeof(int), 0);
 			
 			return exRetCode;
 		}
