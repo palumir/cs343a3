@@ -7,7 +7,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
-#include <arpa/inet.h> 
+#include <arpa/inet.h>
+#include <pthread.h> 
 #include "constant.h"
 #include "rpc.h"
 using namespace std;
@@ -25,7 +26,7 @@ int listenToNewSocket() {
 	int socketFD;
 	char host[256];
 	struct sockaddr_in serverIn;
-    struct addrinfo *server;
+        struct addrinfo *server;
 	struct addrinfo h;
 	struct addrinfo *r;
 	
@@ -61,7 +62,7 @@ int connectToSocket(char *address, int port) {
 	int portNum = port;
 	
 	// Connect to the socket
-    socketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        socketFD = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	
 	// Get the host, address, and connect
 	server = gethostbyname(address);
@@ -122,6 +123,8 @@ void * runFunction(void *threadArgs) {
 		int exFail = EXECUTE_FAILURE;
 		send(socketfd, &exFail, sizeof(int), 0);
 	}
+
+        return 0;
 }
 
 void handle_execute_request(int socketfd, int msg_len) {
@@ -228,9 +231,25 @@ int rpcInit() {
 
 int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
-	// Send length of argTypes.
+	/* Send length of argTypes.
 	int argTypesLen = sizeof(argTypes)/sizeof(int);
-	send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
+	send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);*/
+
+        //Johnson: send length of function name plus the length of argTypes array
+        int length = NAME_LENGTH; // length of function name
+        int argTypesLen = 0;
+        int num = -1;
+        while(num != 0) {
+          num = argTypes[argTypesLen];
+          argTypesLen ++;
+        }
+        cerr << "argTypesLen: " << argTypesLen << endl;
+        for(int i = 0; i < argTypesLen; ++i) {
+          cerr << "argTypes: " << argTypes[i] << endl;
+        }
+        length += argTypesLen; // length of function name + length of argTypes array
+        cerr << "msg length: " << length << endl;
+        send(binderFD, &length, sizeof(length), 0);
 	
 	// Send type of request.
 	int type = REGISTER;
@@ -239,22 +258,23 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 	// Send hostname.
 	char hostName[HOSTNAME_LENGTH];
 	gethostname(hostName, HOSTNAME_LENGTH);
-	string host = hostName;
-	send(binderFD, &host, HOSTNAME_LENGTH, 0);
+	//string host = hostName;
+	send(binderFD, &hostName, HOSTNAME_LENGTH, 0);
 	
 	// Send port.
 	struct sockaddr_in sin;
-    socklen_t sinlen = sizeof(sin);
-    getsockname(listenFD, (struct sockaddr *)&sin, &sinlen);
-    int listenPort = ntohs(sin.sin_port);
+        socklen_t sinlen = sizeof(sin);
+        getsockname(listenFD, (struct sockaddr *)&sin, &sinlen);
+        int listenPort = ntohs(sin.sin_port);
 	send(binderFD, &listenPort, PORT_LENGTH, 0);
 	
 	// Send function name.
-	string functionName = name;
-	send(binderFD, &functionName, NAME_LENGTH, 0);
+	//string functionName = name;
+	send(binderFD, name, NAME_LENGTH, 0);
 	
 	// Send argTypes.
-	send(binderFD, &argTypes, argTypesLen, 0);
+        // Johnson: argTypesLen * 4 since the size of of each item at argTypes is 4 
+	send(binderFD, argTypes, argTypesLen * 4, 0);
 	
 	// Receive from binder success or failure.
 	int retCode;
@@ -272,11 +292,15 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 		argTypesList[numRegistered] = argTypes;
 		functionNames[numRegistered] = name;
 		numRegistered++;
+               
+                cerr << "REGISTER_SUCCESS: " << name << endl;
 		return REGISTER_SUCCESS;
 	}
 	
 	// Do nothing, it's already registered.
 	else if(retCode == DUPLICATE_REGISTER) {
+
+                cerr << "DUPLICATE_REGISTER: " << name << endl;
 		return DUPLICATE_REGISTER;
 	}
 	

@@ -44,7 +44,6 @@ int tcpInit(int *n_port, int* socketfd) {
 
 
 int getMsgLength(int socketfd) {
-    //char msg_length[4] = {0};
     int msg_len;
     
     int length_num = recv(socketfd, &msg_len, sizeof(msg_len), 0);
@@ -61,8 +60,6 @@ int getMsgLength(int socketfd) {
 }
 
 int getMsgType(int socketfd) {
-    //char msg_type_char[4] = {0};
-    
     int msg_type;
     
     int type_num = recv(socketfd, &msg_type, sizeof(msg_type), 0);
@@ -80,11 +77,7 @@ int getMsgType(int socketfd) {
 
 bool sameArgTypes(int a, int b) {
     bool is_a_scalar = false;
-    bool is_b_scalar = true;
-    
-    //input or output
-    int ioa = a >> 30;
-    int iob = b >> 30;
+    bool is_b_scalar = false;
     
     //type
     int typea = a >> 16;
@@ -100,7 +93,7 @@ bool sameArgTypes(int a, int b) {
         is_b_scalar = true;
     }
     
-    if (ioa == iob && typea == typeb) {
+    if (typea == typeb) {
         if (is_a_scalar == is_b_scalar) {
             return true;
         }
@@ -111,6 +104,7 @@ bool sameArgTypes(int a, int b) {
 
 void handle_loc_request(int socketfd, int msg_len) {
     //LOC_REQUEST, name, argTypes
+    cerr << "handle_loc_request" << endl;
     
     //get function name
     char function_name[NAME_LENGTH];
@@ -233,6 +227,7 @@ void handle_loc_request(int socketfd, int msg_len) {
 
 void handle_register_request(int socketfd, int msg_len) {
     //REGISTER, server_identifier, port, name, argTypes
+    cerr << "handle_register_request" << endl;
     
     //get server_identifier
     char server_identifier[HOSTNAME_LENGTH];
@@ -241,6 +236,7 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive server identifier of reg_requst message" << endl;
         //return -1;
     }
+    cerr << "received server identifier at handle_register_request: " << server_identifier << endl;
 
     
     //get port
@@ -251,6 +247,7 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive port number of reg_requst message" << endl;
         //return -1;
     }
+    cerr << "received port at handle_register_request: " << port << endl;
     
     //get function name
     char function_name[NAME_LENGTH];
@@ -259,14 +256,18 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive function name of reg_requst message" << endl;
         //return -1;
     }
+    cerr << "received function_name at handle_register_request: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
-    int argType[msg_len_int / 4];// divided by 4 since the size of each int in argTypes is 4 bytes
-    int recv_argTypes_num = recv(socketfd, argType, msg_len_int, 0);
+    int* argType = new int[msg_len_int];// divided by 4 since the size of each int in argTypes is 4 bytes
+    int recv_argTypes_num = recv(socketfd, argType, msg_len_int * 4, 0);
     if(recv_argTypes_num < 0) {
         cerr << "Error: fail to receive argTypes part of reg_requst message" << endl;
         //return -1;
+    }
+    for(int i = 0; i < msg_len_int; ++i) {
+      cerr << "received argTypes: " << argType[i] << endl;
     }
     
     //check whether the server or function is in database
@@ -276,7 +277,8 @@ void handle_register_request(int socketfd, int msg_len) {
     for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
          it != binder_database.end(); ++it) {
         //found server
-        if(it->first.server_name == string(server_identifier)) {
+        if(it->first.server_name == string(server_identifier) && it->first.port_num == port) {
+            cerr << "found server at the database" << endl;
             server_exist = true;
             server_location.server_socket = it->first.server_socket;
             server_location.server_name = it->first.server_name;
@@ -289,6 +291,7 @@ void handle_register_request(int socketfd, int msg_len) {
                 //compare function name
                 string function_name_temp = i->function_name;
                 if (function_name_temp == string(function_name)) {
+                    cerr << "found the function at the database" << endl;
                     //compare args
                     int totalArgs = i->numArgs;
                     for(int j = 0; j < totalArgs; ++j) {
@@ -330,14 +333,18 @@ void handle_register_request(int socketfd, int msg_len) {
     function_info ftn;
     if(!function_exist) {
       ftn.function_name = string(function_name);
-      ftn.argTypes = new int[msg_len_int / 4];
-      memcpy(ftn.argTypes, argType, msg_len_int);
-      ftn.numArgs = msg_len_int / 4;
-      
+      ftn.argTypes = new int[msg_len_int];
+      ftn.numArgs = msg_len_int;
+
+      for(int i = 0; i < msg_len_int; ++i) {
+        ftn.argTypes[i] = argType[i];
+        cerr << "argTypes in database: " << ftn.argTypes[i] << endl;
+      }
+
       //add function to database
       binder_database[server_location].push_back(ftn);
         
-      delete(ftn.argTypes);
+      //delete(ftn.argTypes);
     }
     
     
@@ -347,18 +354,22 @@ void handle_register_request(int socketfd, int msg_len) {
     server_in_DB = binder_database.find(server_location);
     
     if(server_in_DB != binder_database.end()) {
+      cerr << "successfuly register server location" << endl;
       vector<function_info>::iterator function_in_DB;
       for (function_in_DB = binder_database[server_location].begin();
            function_in_DB != binder_database[server_location].end(); ++function_in_DB) {
           //same function name
           if (function_in_DB->function_name == ftn.function_name) {
+              cerr << "successfuly register ftn name" << endl;
               //same numArgs and argTypes
               if(function_in_DB->numArgs == ftn.numArgs) {
+                  cerr << "successfuly register num args" << endl;
                   for (int j = 0; j < ftn.numArgs; ++j) {
                       if (!sameArgTypes(function_in_DB->argTypes[j], ftn.argTypes[j])) {
                           break;
                       }
                       else if (j == ftn.numArgs - 1) {
+                          cerr << "successfuly register the whole ftn" << endl;
                           success = true;
                       }
                   }
@@ -385,10 +396,12 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to REGISTER_FAILURE the message" << endl;
       }
     }
+    delete(argType);
 }
 
 void handle_terminate_request(int socketfd) {
     //TERMINATE
+    cerr << "handle_terminate_request" << endl;
     
     //get binder's name
     char hostname[HOSTNAME_LENGTH];
@@ -481,7 +494,7 @@ int main(int argc, const char* argv[]) {
               cerr << "failed to accept connection" << endl;
             }
                     
-            cerr << "connected to client" << endl;
+            cerr << "connected" << endl;
             //update the descriptor sets
             FD_SET(connectionfd, &rset);
             if(connectionfd > highsock) {
@@ -495,6 +508,7 @@ int main(int argc, const char* argv[]) {
             if (msg_len == -1) {
                 return -1;
             }
+            cerr << "msg_len: " << msg_len << endl;
               
             //msg_len == 0 means server tries to end connection
             if(msg_len == 0) {
@@ -503,7 +517,7 @@ int main(int argc, const char* argv[]) {
                 
               //remove from server list
               servers_socket.erase(remove(servers_socket.begin(), servers_socket.end(), i), servers_socket.end());
-                
+  
               for (vector<server_info>::iterator it = all_servers.begin();
                    it != all_servers.end(); ++it) {
                    if(it->server_socket == i) {
@@ -515,7 +529,18 @@ int main(int argc, const char* argv[]) {
               //remove entry of closed server from database
               for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
                    it != binder_database.end(); ++it) {
-                   if (it->first.server_socket == i) {
+                   server_info temp_server;
+                   temp_server.server_socket = it->first.server_socket;
+                   temp_server.server_name = it->first.server_name;
+                   temp_server.port_num = it->first.port_num;
+
+                   if (temp_server.server_socket == i) {
+                      vector<function_info>::iterator function_in_DB;
+                      for(function_in_DB = binder_database[temp_server].begin(); 
+                          function_in_DB != binder_database[temp_server].end(); ++function_in_DB) {
+                        delete(function_in_DB->argTypes);
+                        binder_database[temp_server].erase(function_in_DB);
+                      }
                       binder_database.erase(it);
                    }
               }

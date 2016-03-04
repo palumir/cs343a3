@@ -1,0 +1,24 @@
+TODO:
+1. In rpc.cc:
+   skeleton registeredFunctions[256];
+   string functionNames[256];
+   int* argTypesList[256];
+   These 3 data structures should be vector/map or other data structures other  
+   than hardcoded length array
+
+2.
+
+
+Done:
+1. makefile
+2. server can successfully register its functions into binder's database
+3. binder's database is able to handle duplicate register and function overloading(I
+   think)
+
+
+Function being tested:
+1. rpcInit:     yes, not fully test 
+2. rpcCall:     no
+3. rpcRegister: yes, cannot find any bugs so far
+4. rpcExecute:  no
+5. pcTerminate: no

@@ -19,7 +19,10 @@ struct function_info {
 
 struct Comparer {
   bool operator() (const server_info &s1, const server_info &s2) const {
-    return s1.server_name < s2.server_name;
+    if(s1.server_name != s2.server_name) {
+      return s1.server_name < s2.server_name;
+    }
+    return s1.port_num < s2.port_num;
   }
 };
 
