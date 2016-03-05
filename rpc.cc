@@ -11,22 +11,24 @@
 #include <pthread.h> 
 #include "constant.h"
 #include "rpc.h"
+#include <vector>
 using namespace std;
 
 // Registered functions.
-int numRegistered = 0;
-skeleton registeredFunctions[256];
-string functionNames[256];
-int* argTypesList[256];
+vector<skeleton> registeredFunctions;
+vector<string> functionNames;
+vector<int*> argTypesList;
 
 int binderFD = -1;
 int listenFD = -1;
+
+int numThreads = 0;
 
 int listenToNewSocket() {
 	int socketFD;
 	char host[256];
 	struct sockaddr_in serverIn;
-        struct addrinfo *server;
+    struct addrinfo *server;
 	struct addrinfo h;
 	struct addrinfo *r;
 	
@@ -102,29 +104,36 @@ int getMsgType(int socketfd) {
     return msg_type;
 }
 
-void * runFunction(void *threadArgs) {
+class argStruct {
+	public:
+	int functionNumber;
+	void **args;
+	int socketfd;
+};
+
+void * runFunction(void *threadArg) {
+	
+	numThreads++;
 	
 	// Cast all the arguments
-	void ** castArgs = (void**)threadArgs;
-	int functionNumber = *((int*)(&castArgs[0]));
-	void** args = (void**)castArgs[1];
-	int socketfd = *((int*)(&castArgs[2]));
+	argStruct *castArgs = (argStruct*)threadArg;
 	
 	// Run the function.
-	skeleton s = registeredFunctions[functionNumber];
-	int retVal = s(argTypesList[functionNumber], args);
+	skeleton s = registeredFunctions[castArgs->functionNumber];
+	int retVal = s(argTypesList[castArgs->functionNumber], castArgs->args);
 	
 	// Success
 	if(retVal == 0) {
 		int exSucc = EXECUTE_SUCCESS;
-		send(socketfd, &exSucc, sizeof(int), 0);
+		send(castArgs->socketfd, &exSucc, sizeof(int), 0);
 	}
 	else {
 		int exFail = EXECUTE_FAILURE;
-		send(socketfd, &exFail, sizeof(int), 0);
+		send(castArgs->socketfd, &exFail, sizeof(int), 0);
 	}
-
-        return 0;
+	
+	numThreads--;
+    return 0;
 }
 
 int get_arg_size(int type) {
@@ -213,7 +222,7 @@ void handle_execute_request(int socketfd, int msg_len) {
     // Check if the function is registered in our DB and then run it if it is.
 	int x = 0;
 	int foundFunction = -1;
-	while(x < numRegistered) {
+	while(x < (int)functionNames.size()) {
 		if(function_name == functionNames[x]) {
 			foundFunction = x;
 			break;
@@ -224,12 +233,10 @@ void handle_execute_request(int socketfd, int msg_len) {
 	// Found the function, execute it in a new pthread.
 	if(foundFunction != -1) {
 		pthread_t runThread;
-		int * foundFunctionThread = new int(foundFunction);
-		int * socketFDThread = new int(socketfd);
-		void ** threadArgs = new void*[3];
-		threadArgs[0] = (void*)foundFunctionThread;
-		threadArgs[1] = args;
-		threadArgs[2] = (void*)socketFDThread;
+		argStruct *threadArgs = new argStruct();
+		threadArgs->functionNumber = foundFunction;
+		threadArgs->args = args;
+		threadArgs->socketfd = socketfd;
 		pthread_create(&runThread, NULL, &runFunction, (void*)threadArgs);
 	}
         delete(argType);
@@ -328,10 +335,9 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 	
 	// Register success. Do stuff.
 	else if(retCode == REGISTER_SUCCESS) {
-		registeredFunctions[numRegistered] = f;
-		argTypesList[numRegistered] = argTypes;
-		functionNames[numRegistered] = name;
-		numRegistered++;
+		registeredFunctions.push_back(f);
+		argTypesList.push_back(argTypes);
+		functionNames.push_back(name);
                
                 cerr << "REGISTER_SUCCESS: " << name << endl;
 		return REGISTER_SUCCESS;
@@ -524,8 +530,9 @@ int rpcExecute() {
     
     int highsock = listenFD;
     int readsocks;
+	bool terminate = false;
     
-    while (1) {
+    while (!terminate) {
         memcpy(&rfds, &rset, sizeof(rset));
         readsocks = select(highsock + 1, &rfds, (fd_set *) 0, (fd_set *) 0, NULL);
         
@@ -579,9 +586,15 @@ int rpcExecute() {
                             case EXECUTE:
                             handle_execute_request(i, msg_len);
                             break;
+							
+							case TERMINATE:
+							while(numThreads>0);
+							terminate = true;
+							break;
                     }
                 }
             }
+			if(terminate) break;
         }
     }
        

@@ -1,4 +1,4 @@
-Group Members: Andrew Jenkins(ID:  ), Dingzhong Chen(ID: dzchen)
+Group Members: Andrew Jenkins(ID: a5jenkin), Dingzhong Chen(ID: dzchen)
 
 
 Instructions

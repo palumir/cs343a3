@@ -1,30 +1,25 @@
 TODO:
-1. In rpc.cc:
-   skeleton registeredFunctions[256];
-   string functionNames[256];
-   int* argTypesList[256];
-   These 3 data structures should be vector/map or other data structures instead  
-   of hardcoded length array
-
-2. Segmentation fault at server after successfully receiving function information from 
+1. Segmentation fault at server after successfully receiving function information from 
    client at rpc.cc:211 (1 server, 1 client and server, client and binder are running on 3  
    different machines)
+   
+Andrew: Segmentation fault fixed. Gets hung up on f3. f2 and f1 return incorrect.
 
-3. termination stage
+2. termination stage
 
-4. 1 server, 1 client 
+3. 1 server, 1 client 
 
-5. 1 server, multiple clients
+4. 1 server, multiple clients
 
-6. multiple servers, 1 client
+5. multiple servers, 1 client
 
-7. multiple servers, multiple clients
+6. multiple servers, multiple clients
 
-8. round robin
+7. round robin
 
-9. function overloading
+8. function overloading
 
-10. server/client failure
+9. server/client failure
 
  
 Done:
@@ -34,6 +29,12 @@ Done:
    think)
 4. binder can accept the loc_request from client and be able to send server's location 
    back to client
+5. In rpc.cc:
+   skeleton registeredFunctions[256];
+   string functionNames[256];
+   int* argTypesList[256];
+   These 3 data structures should be vector/map or other data structures instead  
+   of hardcoded length array
 
 
 Function being tested:
