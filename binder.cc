@@ -44,7 +44,7 @@ int tcpInit(int *n_port, int* socketfd) {
 
 
 int getMsgLength(int socketfd) {
-    int msg_len;
+    int msg_len = 0;
     
     int length_num = recv(socketfd, &msg_len, sizeof(msg_len), 0);
     if(length_num < 0) {
@@ -533,19 +533,21 @@ int main(int argc, const char* argv[]) {
               
             //msg_len == 0 means server tries to end connection
             if(msg_len == 0) {
+              cerr << "closing connection" << endl;
               FD_CLR(i, &rset);
               close(i);
                 
               //remove from server list
               servers_socket.erase(remove(servers_socket.begin(), servers_socket.end(), i), servers_socket.end());
-  
+              cerr << "server_socket.erase" << endl;
               for (vector<server_info>::iterator it = all_servers.begin();
                    it != all_servers.end(); ++it) {
                    if(it->server_socket == i) {
                       all_servers.erase(it);
+                      break;
                    }
               }
-              
+              cerr << "removed from server list" << endl; 
               
               //remove entry of closed server from database
               for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
@@ -561,11 +563,13 @@ int main(int argc, const char* argv[]) {
                           function_in_DB != binder_database[temp_server].end(); ++function_in_DB) {
                         delete(function_in_DB->argTypes);
                         binder_database[temp_server].erase(function_in_DB);
+                        break;
                       }
                       binder_database.erase(it);
+                      break;
                    }
               }
-                
+              cerr << "removed entry of closed server from database" << endl;  
               //close binder after termination of all servers
               if (all_close && binder_database.empty() &&
                   servers_socket.empty() && all_servers.empty()) {

@@ -79,7 +79,7 @@ int connectToSocket(char *address, int port) {
 }
 
 int getMsgLength(int socketfd) {
-    int msg_len;
+    int msg_len = 0;
     
     int length_num = recv(socketfd, &msg_len, sizeof(msg_len), 0);
     if(length_num < 0) {
