@@ -1,13 +1,9 @@
 TODO:
-1. Segmentation fault at server after successfully receiving function information from 
-   client at rpc.cc:211 (1 server, 1 client and server, client and binder are running on 3  
-   different machines)
-   
-Andrew: Segmentation fault fixed. Gets hung up on f3. f2 and f1 return incorrect.
+1. termination stage: client can be terminated gracefully. However, server and binder don't terminate after receiving TERMINATE    MESSAGE from client
 
-2. termination stage
+2. 1 server, 1 client 
 
-3. 1 server, 1 client 
+3. create more sample propgrams for testing
 
 4. 1 server, multiple clients
 
@@ -19,9 +15,10 @@ Andrew: Segmentation fault fixed. Gets hung up on f3. f2 and f1 return incorrect
 
 8. function overloading
 
-9. server/client failure
+9. Memory Leak
 
- 
+10.handle server/client failure
+
 Done:
 1. makefile
 2. server can successfully register its functions into binder's database
@@ -35,11 +32,12 @@ Done:
    int* argTypesList[256];
    These 3 data structures should be vector/map or other data structures instead  
    of hardcoded length array
+6. All functions returned correctly   
 
 
 Function being tested:
-1. rpcInit:     yes 
-2. rpcCall:     yes, not fully test due to seg fault
-3. rpcRegister: yes, cannot find any bugs so far
-4. rpcExecute:  yes, not fully test due to seg fault
-5. rpcTerminate: no
+1. rpcInit:      yes 
+2. rpcCall:      yes, cannot find any bugs so far
+3. rpcRegister:  yes, cannot find any bugs so far
+4. rpcExecute:   yes, cannot terminate after receiving TERMINATE MESSAGE from client
+5. rpcTerminate: yes
