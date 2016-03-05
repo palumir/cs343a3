@@ -24,7 +24,7 @@ TODO:
 
 9. function overloading
 
-10. 
+10. server/client failure
 
  
 Done:
