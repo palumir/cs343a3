@@ -3,22 +3,42 @@ TODO:
    skeleton registeredFunctions[256];
    string functionNames[256];
    int* argTypesList[256];
-   These 3 data structures should be vector/map or other data structures other  
-   than hardcoded length array
+   These 3 data structures should be vector/map or other data structures instead  
+   of hardcoded length array
 
-2.
+2. Segmentation fault at server after successfully receiving function information from 
+   client at rpc.cc:211 (1 server, 1 client and server, client and binder are running on 3  
+   different machines)
 
+3. termination stage
 
+4. 1 server, 1 client 
+
+5. 1 server, multiple clients
+
+6. multiple servers, 1 client
+
+7. multiple servers, multiple clients
+
+8. round robin
+
+9. function overloading
+
+10. 
+
+ 
 Done:
 1. makefile
 2. server can successfully register its functions into binder's database
 3. binder's database is able to handle duplicate register and function overloading(I
    think)
+4. binder can accept the loc_request from client and be able to send server's location 
+   back to client
 
 
 Function being tested:
-1. rpcInit:     yes, not fully test 
-2. rpcCall:     no
+1. rpcInit:     yes 
+2. rpcCall:     yes, not fully test due to seg fault
 3. rpcRegister: yes, cannot find any bugs so far
-4. rpcExecute:  no
-5. pcTerminate: no
+4. rpcExecute:  yes, not fully test due to seg fault
+5. rpcTerminate: no

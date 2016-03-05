@@ -41,11 +41,11 @@ int listenToNewSocket() {
 		cerr << "Problem getting addrinfo" << endl;
 	}
 	
-	// Create socket, bind, and listen for 5 possible clients.
+	// Create socket, bind, and listen for clients.
 	r = server;
 	socketFD = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
 	bind(socketFD, server->ai_addr, server->ai_addrlen);
-	listen(socketFD, 5);
+	listen(socketFD, SOMAXCONN); // unbounded number of connections
 	
 	// Get hostname and socket name to print.
 	gethostname(host, 256);
@@ -127,6 +127,38 @@ void * runFunction(void *threadArgs) {
         return 0;
 }
 
+int get_arg_size(int type) {
+    int arg_size = -1;
+
+    switch(type) {
+          case ARG_CHAR:
+            arg_size = 1;
+            break;
+          
+          case ARG_SHORT:
+            arg_size = 2;
+            break;
+
+          case ARG_INT:
+            arg_size = 3;
+            break;
+
+          case ARG_LONG:
+            arg_size = 4;
+            break;
+
+          case ARG_DOUBLE:
+            arg_size = 5;
+            break;
+
+          case ARG_FLOAT:
+            arg_size = 6;
+            break;
+    }
+    
+    return arg_size;
+}
+
 void handle_execute_request(int socketfd, int msg_len) {
     //EXECUTE, name, argTypes, args
     
@@ -137,20 +169,24 @@ void handle_execute_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive name part of loc_requst message" << endl;
         //return -1;
     }
+    cerr << "client calls funtion: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
-    int argType[msg_len_int / 4];// divide by 4 since the size of each int in argTypes is 4 bytes
-    int recv_argTypes_num = recv(socketfd, argType, msg_len_int, 0);
+    int* argType = new int[msg_len_int];// divide by 4 since the size of each int in argTypes is 4 bytes
+    int recv_argTypes_num = recv(socketfd, argType, msg_len_int * 4, 0);
     if(recv_argTypes_num < 0) {
         cerr << "Error: fail to receive argTypes part of loc_requst message" << endl;
         //return -1;
     }
+    for(int i = 0; i < msg_len_int; ++i) {
+        cerr << "argTypes receives from client: " << argType[i] << endl;
+    }
 
     //get args
-    int num_args = msg_len_int / 4 - 1; // the size of argTypes is 1 greater than the size of args
+    int num_args = msg_len_int - 1; // the size of argTypes is 1 greater than the size of args
     void** args = new void*[num_args];
-    for (int i = 0; i == num_args; ++i) {
+    for (int i = 0; i < num_args; ++i) {
         //recv the size of the arg
         int size_of_arg;
         int recv_size_arg = recv(socketfd, &size_of_arg, sizeof(size_of_arg), 0);
@@ -158,6 +194,7 @@ void handle_execute_request(int socketfd, int msg_len) {
             cerr << "Error: fail to receive size of arg" << endl;
             //return -1;
         }
+        cerr << "arg size: " << size_of_arg << endl;
 
         //recv the arg
         void *arg = (void *)malloc(size_of_arg); // c++ is not allowed to use new for void so use malloc
@@ -167,9 +204,11 @@ void handle_execute_request(int socketfd, int msg_len) {
             //return -1;
         }
         
-        //put arg into arg array
+        //put arg into args array
         args[i] = arg;
+        cerr << "arg: " << &args[i] << endl;
     }
+    cerr << "successfully receive function message from client" << endl;
 	
     // Check if the function is registered in our DB and then run it if it is.
 	int x = 0;
@@ -193,6 +232,7 @@ void handle_execute_request(int socketfd, int msg_len) {
 		threadArgs[2] = (void*)socketFDThread;
 		pthread_create(&runThread, NULL, &runFunction, (void*)threadArgs);
 	}
+        delete(argType);
     
 }
 
@@ -313,56 +353,131 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 }
 
 int rpcCall(char* name, int* argTypes, void** args) {
-	if(binderFD > 0) {
-		// Send length of argTypes.
+        //client will call this which means we need to make a connection to binder
+        int client_binderFD = -1;       
+
+        // Retrieve binder info
+	char * address = getenv("BINDER_ADDRESS");
+	if(address==NULL) {
+		cerr << "Couldn't get binder address: " << endl;
+		return ADDRESS_ERROR;
+	}
+
+	char * port = getenv("BINDER_PORT");
+	if(port==NULL) {
+		cerr << "Couldn't get port address: " << endl;
+		return PORT_ERROR;
+	}
+	
+	// Connect to binder.
+	client_binderFD = connectToSocket(address, atoi(port));
+	if(client_binderFD < 0) {
+		cerr << "Couldn't connect to binder." << endl;
+		return CONNECT_BINDER_ERROR;
+	} 
+
+
+	if(client_binderFD > 0) {
+		/* Send length of argTypes.
 		int argTypesLen = sizeof(argTypes)/sizeof(int);
-		send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);
+		send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);*/
+
+                //Johnson: send length of function name plus the length of argTypes array
+                int length = NAME_LENGTH; // length of function name
+                int argTypesLen = 0;
+                int num = -1;
+                while(num != 0) {
+                  num = argTypes[argTypesLen];
+                  argTypesLen ++;
+                }
+                cerr << "argTypesLen: " << argTypesLen << endl;
+                for(int i = 0; i < argTypesLen; ++i) {
+                  cerr << "argTypes: " << argTypes[i] << endl;
+                }
+                length += argTypesLen; // length of function name + length of argTypes array
+                cerr << "msg length: " << length << endl;
+                send(client_binderFD, &length, sizeof(length), 0);
 		
 		// Send type of request.
 		int type = LOC_REQUEST;
-		send(binderFD, &type, sizeof(type), 0);
+		send(client_binderFD, &type, sizeof(type), 0);
 		
 		// Send function name.
-		string functionName = name;
-		send(binderFD, &functionName, NAME_LENGTH, 0);
+		//string functionName = name;
+		send(client_binderFD, name, NAME_LENGTH, 0);
 		
 		// Send argTypes.
-		send(binderFD, &argTypes, argTypesLen, 0);
+		// Johnson: argTypesLen * 4 since the size of of each item at argTypes is 4 
+	        send(client_binderFD, argTypes, argTypesLen * 4, 0);
 		
 		// Receive from binder success or failure.
 		int retCode;
-		recv(binderFD, &retCode, sizeof(retCode), 0);
+		recv(client_binderFD, &retCode, sizeof(retCode), 0);
+                
+                //close connection to binder when done
 		
 		if(retCode == LOC_SUCCESS) {
 			
-			// Receive server name.
+			/* Receive server name.
 			char * serverName = new char[NAME_LENGTH];
-			recv(binderFD, serverName, NAME_LENGTH, 0);
+			recv(client_binderFD, serverName, NAME_LENGTH, 0);
+                        cerr << "serverName: " << serverName << endl;*/
 			
 			// Receive server port.
 			int serverPort;
-			recv(binderFD, &serverPort, PORT_LENGTH, 0);
+			int test = recv(client_binderFD, &serverPort, sizeof(serverPort), 0);
+                        if(test < 0) {
+                          cerr << "failed to receive serverPort" << endl;
+                        }
+                        cerr << "serverPort: " << serverPort << endl;
+
+                        //Receive server name.
+			char * serverName = new char[NAME_LENGTH];
+			recv(client_binderFD, serverName, NAME_LENGTH, 0);
+                        cerr << "serverName: " << serverName << endl;
 			
 			// Get the server's socket file descriptor.
 			int serverFD = connectToSocket(serverName, serverPort);
+
+                        //send length
+                        send(serverFD, &length, sizeof(length), 0);
 			
 			// Notify we are sending an execute request.
 			int execute = EXECUTE;
 			send(serverFD, &execute, sizeof(int), 0);
 			
 			// Send name
-			send(serverFD, &name, sizeof(NAME_LENGTH), 0);
+			send(serverFD, name, NAME_LENGTH, 0);
 			
 			// Send argTypes
-			send(serverFD, &argTypes, sizeof(argTypes), 0);
+			send(serverFD, argTypes, argTypesLen * 4, 0);
 			
-			// Send args
-			send(serverFD, &args, sizeof(args), 0);
-			
+			// Send args (one by one)
+                        for(int i = 0; i < argTypesLen - 1; ++i) {
+                          //send size of args
+                          int temp = (argTypes[i] >> 16) & 15;
+                          int arg_size = get_arg_size(temp);
+                          int length = argTypes[i] & ((1 << 16) - 1);// array or scalar
+                          if(length == 0) {
+                            length = 1;
+                          }
+                          arg_size *= length;
+                          send(serverFD, &arg_size, sizeof(arg_size), 0);
+                          cerr << "arg_size sent: " << arg_size << endl;
+                          
+                          //send args
+			  send(serverFD, args[i], arg_size, 0);
+                          cerr << "args: " << &args[i] << endl;
+			} 
+                        
 			// Receive the return value.
 			int exRetCode;
 			recv(serverFD, &exRetCode, sizeof(int), 0);
 			
+                        //Johnson: close connection when done
+                        close(serverFD);
+                        delete(serverName);
+
 			return exRetCode;
 		}
 		
@@ -375,6 +490,10 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			return TYPE_ERROR;
 		}
 	}
+
+        //close connection when done
+        close(client_binderFD);
+
 	return 0;
 }
 
@@ -383,7 +502,7 @@ int rpcCacheCall(char* name, int* argTypes, void** args) {
 }
 
 int rpcExecute() {
-	//wait for connection from client (unbounded)
+    //wait for connection from client (unbounded)
     int listen_num = listen(listenFD, SOMAXCONN);
     if (listen_num != 0) {
         close(listenFD);
@@ -440,6 +559,7 @@ int rpcExecute() {
                     if (msg_len == -1) {
                         return -1;
                     }
+                    cerr << "msg_len: " << msg_len << endl;
                     
                     //msg_len == 0 means client tries to end connection
                     if(msg_len == 0) {
@@ -453,6 +573,7 @@ int rpcExecute() {
                     if (msg_type == -1) {
                         return -1;
                     }
+                    cerr << "msg_type: " << msg_type << endl;
                     
                     switch (msg_type) {
                             case EXECUTE:

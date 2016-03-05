@@ -113,15 +113,20 @@ void handle_loc_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive name part of loc_requst message" << endl;
         //return -1;
     }
+    cerr << "client calls funtion: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
-    int argType[msg_len_int / 4];// divide by 4 since the size of each int in argTypes is 4 bytes
-    int recv_argTypes_num = recv(socketfd, argType, msg_len_int, 0);
+    int* argType = new int[msg_len_int];
+    int recv_argTypes_num = recv(socketfd, argType, msg_len_int * 4, 0);
     if(recv_argTypes_num < 0) {
         cerr << "Error: fail to receive argTypes part of loc_requst message" << endl;
         //return -1;
     }
+    for(int i = 0; i < msg_len_int; ++i) {
+      cerr << "received argTypes from client: " << argType[i] << endl;
+    }
+    
     
     //search at the database with function name and argTypes
     bool found = false;
@@ -158,11 +163,14 @@ void handle_loc_request(int socketfd, int msg_len) {
     bool finished_round_robin = false;
     server_info temp_server;
     if (found) {
+        cerr << "found function that client calls in database" << endl;
         for(vector<server_info>::iterator it = all_servers.begin();
             it != all_servers.end(); ++it) {
             for (vector<string>::iterator i = all_valid_server.begin();
                  i != all_valid_server.end(); ++i) {
                 string v_server = *i;
+                cerr << "server_name in database: " << it->server_name << endl;
+                cerr << "valid_server: " << v_server << endl;
                 if (it->server_name == v_server) {
                   server_name_result = it->server_name;
                   server_port_result = it->port_num;
@@ -196,8 +204,27 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_success_message < 0) {
             cerr << "Error: fail to send success message when handle the loc_req message" << endl;
         }
+        cerr << "LOC_SUCCESS sent" << endl;
 
         
+        /*send server_name
+        char server_name[HOSTNAME_LENGTH];
+        strcpy(server_name, server_name_result.c_str());
+        server_name[HOSTNAME_LENGTH - 1] = '\0';
+        int send_server_name = send(socketfd, server_name, HOSTNAME_LENGTH, 0);
+        if (send_server_name < 0) {
+            cerr << "Error: fail to send the server name when handle the loc_req message" << endl;
+        }
+        cerr << "server_name sent: " << server_name << endl;*/
+        
+        //send port_num
+        int port = server_port_result;
+        int send_port_num = send(socketfd, &port, sizeof(port), 0);
+        if (send_port_num < 0) {
+            cerr << "Error: fail to send the port num when handle the loc_req message" << endl;
+        }
+        cerr << "port_num sent: " << port << endl;
+
         //send server_name
         char server_name[HOSTNAME_LENGTH];
         strcpy(server_name, server_name_result.c_str());
@@ -206,13 +233,7 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_server_name < 0) {
             cerr << "Error: fail to send the server name when handle the loc_req message" << endl;
         }
-        
-        //send port_num
-        int port = server_port_result;
-        int send_port_num = send(socketfd, &port, sizeof(port), 0);
-        if (send_port_num < 0) {
-            cerr << "Error: fail to send the port num when handle the loc_req message" << endl;
-        }
+        cerr << "server_name sent: " << server_name << endl;
     }
     else {
         //send failure message
@@ -222,7 +243,7 @@ void handle_loc_request(int socketfd, int msg_len) {
             cerr << "Error: fail to send the failure message when handle the loc_req message" << endl;
         }
     }
-    
+    delete(argType);
 }
 
 void handle_register_request(int socketfd, int msg_len) {
@@ -324,8 +345,8 @@ void handle_register_request(int socketfd, int msg_len) {
       server_location.port_num = port;
         
       //add to server list
-      all_servers.push_back(server_location);
-      servers_socket.push_back(socketfd);
+      all_servers.insert(all_servers.begin(), server_location);
+      servers_socket.insert(servers_socket.begin(), socketfd);
       vector<function_info> new_list_of_function;
       binder_database.insert(make_pair(server_location, new_list_of_function));
     }
@@ -508,7 +529,7 @@ int main(int argc, const char* argv[]) {
             if (msg_len == -1) {
                 return -1;
             }
-            cerr << "msg_len: " << msg_len << endl;
+            //cerr << "msg_len: " << msg_len << endl;
               
             //msg_len == 0 means server tries to end connection
             if(msg_len == 0) {
@@ -559,9 +580,11 @@ int main(int argc, const char* argv[]) {
             if (msg_type == -1) {
               return -1;
             }
-              
+            //cerr << "msg_type: " << msg_type << endl;              
+
             switch (msg_type) {
                 case LOC_REQUEST:
+                cerr << "LOC_REQUEST" << endl;
                 handle_loc_request(i, msg_len);
                 break;
                       
