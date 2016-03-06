@@ -172,8 +172,6 @@ class argStruct {
 
 void * runFunction(void *threadArg) {
 	
-	numThreads++;
-	
 	// Cast all the arguments
 	argStruct *castArgs = (argStruct*)threadArg;
 	
@@ -231,7 +229,6 @@ void * runFunction(void *threadArg) {
 		send(castArgs->socketfd, &exFail, sizeof(int), 0);
 	}
 	
-	numThreads--;
     return 0;
 }
 
@@ -746,9 +743,8 @@ int rpcExecute() {
                               break;
 							
                             case TERMINATE:
-			      while(numThreads>0);
-			      terminate = true;
-			      break;
+							terminate = true;
+							break;
                     }
                 }
             }
