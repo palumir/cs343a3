@@ -629,14 +629,14 @@ int rpcCall(char* name, int* argTypes, void** args) {
 
                           delete(argType);
                           delete(returned_args);
-                          return EXECUTE_SUCCESS;
                         }
                         else if (exRetCode == EXECUTE_FAILURE) {
-                          return EXECUTE_FAILURE;
+                          cerr << "rpcCall execute failure." << endl;
                         }
 			
                         //Johnson: close connection when done
                         close(serverFD);
+                        close(client_binderFD);
                         delete(serverName);
 
 			return exRetCode;
@@ -644,16 +644,16 @@ int rpcCall(char* name, int* argTypes, void** args) {
 		
 		if(retCode == LOC_FAILURE) {
 			cerr << "rpcCall location failure." << endl;
+                        close(client_binderFD);
 			return LOC_FAILURE;
 		}
 		
 		else {
+                        close(client_binderFD);
 			return TYPE_ERROR;
 		}
 	}
-
-        //close connection when done
-        close(client_binderFD);
+       
 
 	return 0;
 }
@@ -682,10 +682,17 @@ int rpcExecute() {
     FD_ZERO(&rfds);
     FD_ZERO(&rset);
     FD_SET(listenFD, &rset);
-    
-    int highsock = listenFD;
+    FD_SET(binderFD, &rset); // set binderFD
+    int highsock;    
+
+    if(listenFD > binderFD) {
+      highsock = listenFD;
+    }
+    else {
+      highsock = binderFD;
+    }
     int readsocks;
-	bool terminate = false;
+    bool terminate = false;
     
     while (!terminate) {
         memcpy(&rfds, &rset, sizeof(rset));
@@ -743,12 +750,17 @@ int rpcExecute() {
                               break;
 							
                             case TERMINATE:
-							terminate = true;
-							break;
+                              cerr << "received terminate message from binder" << endl;
+			      terminate = true;
+	                      break;
                     }
                 }
             }
-	    if(terminate) break;
+	    if(terminate) {
+              close(listenFD);
+              close(binderFD);
+              break;
+            }
         }
     }
        
@@ -784,6 +796,7 @@ int rpcTerminate() {
 	if(terminateFD > 0) {
 		int terminate = TERMINATE;
 		send(terminateFD, &terminate, sizeof(terminate), 0);
+                close(terminateFD);
 		return 0;
 	}
 	
