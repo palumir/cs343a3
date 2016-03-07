@@ -12,8 +12,8 @@
 
 using namespace std;
 
-vector<int> servers_socket;
-vector<server_info> all_servers;
+vector<int> servers_socket; // for termination stage to send terminate message to all the servers
+vector<server_info> all_servers; //for round robin scheduling
 map<server_info, vector<function_info>, Comparer> binder_database;
 bool all_close = false;
 
@@ -67,10 +67,6 @@ int getMsgType(int socketfd) {
         cerr << "Error: fail to receive message type" << endl;
         return -1;
     }
-    //cout << "get mssage length: " << req_msg[0] + req_msg[1] + req_msg[2] + req_msg[3] << endl;
-    
-    
-    //msg_type = (msg_type_char[0] << 24) + (msg_type_char[1] << 16) + (msg_type_char[2] << 8) + msg_type_char[3];
     
     return msg_type;
 }
@@ -151,7 +147,7 @@ void handle_loc_request(int socketfd, int msg_len) {
                     if (!sameArgTypes(i->argTypes[j], argType[j])) {
                         break;
                     }
-                    else if (j == totalArgs - 1) {
+                    else if (j == totalArgs - 1) { // this server owns the function, add it to the list
                         all_valid_server.push_back(it->first.server_name);
                         found = true;
                     }
@@ -164,6 +160,8 @@ void handle_loc_request(int socketfd, int msg_len) {
     server_info temp_server;
     if (found) {
         cerr << "found function that client calls in database" << endl;
+        //loop through the list of servers from the beginning to see if the server is at the list of valid server
+        //If it owns the function, send the location to client and move it to the back of the list for scheduling and return
         for(vector<server_info>::iterator it = all_servers.begin();
             it != all_servers.end(); ++it) {
             for (vector<string>::iterator i = all_valid_server.begin();
