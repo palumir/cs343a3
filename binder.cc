@@ -67,6 +67,10 @@ int getMsgType(int socketfd) {
         cerr << "Error: fail to receive message type" << endl;
         return -1;
     }
+    //cout << "get mssage length: " << req_msg[0] + req_msg[1] + req_msg[2] + req_msg[3] << endl;
+    
+    
+    //msg_type = (msg_type_char[0] << 24) + (msg_type_char[1] << 16) + (msg_type_char[2] << 8) + msg_type_char[3];
     
     return msg_type;
 }
@@ -131,7 +135,7 @@ void handle_loc_request(int socketfd, int msg_len) {
     string function_name_request = string(function_name);
     
     //for round robin
-    vector<string> all_valid_server; //all servers that owns the function
+    vector<server_info> all_valid_server; //all servers that owns the function
   
     for (map<server_info, vector<function_info> >::iterator it = binder_database.begin();
          it != binder_database.end(); ++it) {
@@ -148,7 +152,12 @@ void handle_loc_request(int socketfd, int msg_len) {
                         break;
                     }
                     else if (j == totalArgs - 1) { // this server owns the function, add it to the list
-                        all_valid_server.push_back(it->first.server_name);
+                        server_info temp;
+                        temp.server_name = it->first.server_name;
+                        temp.port_num = it->first.port_num;
+                        cerr << "server: " << temp.server_name << " is valid" << endl;
+                        cerr << "the port_num is: " << temp.port_num << endl;
+                        all_valid_server.push_back(temp);
                         found = true;
                     }
                 }
@@ -164,23 +173,26 @@ void handle_loc_request(int socketfd, int msg_len) {
         //If it owns the function, send the location to client and move it to the back of the list for scheduling and return
         for(vector<server_info>::iterator it = all_servers.begin();
             it != all_servers.end(); ++it) {
-            for (vector<string>::iterator i = all_valid_server.begin();
+            cerr << "server in the database: " << it->server_name << "   port_num: " << it->port_num << endl;
+            for (vector<server_info>::iterator i = all_valid_server.begin();
                  i != all_valid_server.end(); ++i) {
-                string v_server = *i;
-                cerr << "server_name in database: " << it->server_name << endl;
-                cerr << "valid_server: " << v_server << endl;
-                if (it->server_name == v_server) {
+                string v_server = i->server_name;
+                int v_port = i->port_num;
+                //cerr << "server_name in database: " << it->server_name << endl;
+                //cerr << "valid_server: " << v_server << endl;
+                if (it->server_name == v_server && it->port_num == v_port) {
+                  cerr << "valid_server: " << v_server << "   port_num: " << v_port << endl;
                   server_name_result = it->server_name;
                   server_port_result = it->port_num;
-                
-                  //delete server from the list first
-                  all_servers.erase(it);
+               
                 
                   //then put it at the back in order to do round robin
                   temp_server.server_name = it->server_name;
                   temp_server.server_socket = it->server_socket;
                   temp_server.port_num = it->port_num;
                 
+                  //delete server from the list first, then put it at the back of the list
+                  all_servers.erase(it);
                   all_servers.push_back(temp_server);
                 
                   finished_round_robin = true;
@@ -429,9 +441,17 @@ void handle_terminate_request(int socketfd) {
     
     //inform all the servers to shut down
     for (vector<int>::iterator i = servers_socket.begin();
-         i != servers_socket.begin(); ++i) {
-         //send terminate message
+         i != servers_socket.end(); ++i) {
+         cerr << "sending terminate_request message to all servers" << endl;
          int socket_end = *i;
+         //send length
+         int length = 1;
+         int terminate_message_length = send(socket_end, &length, sizeof(length), 0);
+         if (terminate_message_length < 0) {
+             cerr << "Error: fail to send terminate message length when handle the terminate_req message" << endl;
+         }
+
+         //send terminate message
          int terminate = TERMINATE;
          int terminate_message = send(socket_end, &terminate, sizeof(terminate), 0);
          if (terminate_message < 0) {
