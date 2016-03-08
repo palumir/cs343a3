@@ -216,11 +216,11 @@ void * runFunction(void *threadArg) {
                   }
                   arg_size *= length;
                   send(castArgs->socketfd, &arg_size, sizeof(arg_size), 0);
-                  cerr << "arg_size sent after execution: " << arg_size << endl;
+                  //cerr << "arg_size sent after execution: " << arg_size << endl;
                           
                   //send args
 		  send(castArgs->socketfd, castArgs->args[i], arg_size, 0);
-                  cerr << "args after execution: " << &castArgs->args[i] << endl;
+                  //cerr << "args after execution: " << &castArgs->args[i] << endl;
 	        }       
                 
 	}
@@ -252,9 +252,9 @@ void handle_execute_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive argTypes part of execute message" << endl;
         //return -1;
     }
-    for(int i = 0; i < msg_len_int; ++i) {
+    /*for(int i = 0; i < msg_len_int; ++i) {
         cerr << "argTypes receives from client: " << argType[i] << endl;
-    }
+    }*/
 
     //get args
     int num_args = msg_len_int - 1; // the size of argTypes is 1 greater than the size of args
@@ -267,7 +267,7 @@ void handle_execute_request(int socketfd, int msg_len) {
             cerr << "Error: fail to receive size of arg" << endl;
             //return -1;
         }
-        cerr << "arg size: " << size_of_arg << endl;
+        //cerr << "arg size: " << size_of_arg << endl;
 
         //recv the arg
         void *arg = operator new(size_of_arg);
@@ -279,18 +279,17 @@ void handle_execute_request(int socketfd, int msg_len) {
         
         //put arg into args array
         args[i] = arg;
-        if(string(function_name) == "f0") {
+        /*if(string(function_name) == "f0") {
           printf("result, a0 or b0 in f0 at server before execution is: %d\n", *((int *)(args[i])));
-       }
+       }*/
     }
-    cerr << "successfully receive function message from client" << endl;
+    //cerr << "successfully receive function message from client" << endl;
 	
     // Check if the function is registered in our DB and then run it if it is.
 	int x = 0;
 	int foundFunction = -1;
 	while(x < (int)functionNames.size()) {
 		if(function_name == functionNames[x]) {
-                        cerr << "found the function name in the database" << endl;
                         //function overloading
                         for(int i = 0; i < msg_len_int; ++i) {
 			    if(!sameArgTypes(argType[i], argTypesList[x][i])) {
@@ -299,7 +298,7 @@ void handle_execute_request(int socketfd, int msg_len) {
                             //found
                             if(i == msg_len_int - 1) {
                                 foundFunction = x;
-                                cerr << "found the function in the database" << endl;
+                                //cerr << "found the function in the database" << endl;
                             }
                          }
 		}
@@ -319,10 +318,10 @@ void handle_execute_request(int socketfd, int msg_len) {
                 for (int i = 0; i < num_args; ++i) {
                   threadArgs.args[i] = args[i];
                 }              
-                if(string(function_name) == "f0") {
+                /*if(string(function_name) == "f0") {
                   printf("a0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[1])));
                   printf("b0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[2])));
-                }
+                }*/
 		threadArgs.socketfd = socketfd;
 		pthread_create(&runThread, NULL, &runFunction, (void*)&threadArgs);
 	}
@@ -365,12 +364,8 @@ int rpcInit() {
 }
 
 int rpcRegister(char* name, int* argTypes, skeleton f) {
-	
-	/* Send length of argTypes.
-	int argTypesLen = sizeof(argTypes)/sizeof(int);
-	send(binderFD, &argTypesLen, sizeof(argTypesLen), 0);*/
 
-        //Johnson: send length of function name plus the length of argTypes array
+        //send length of function name plus the length of argTypes array
         int length = NAME_LENGTH; // length of function name
         int argTypesLen = 0;
         int num = -1;
@@ -378,12 +373,12 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
           num = argTypes[argTypesLen];
           argTypesLen ++;
         }
-        cerr << "argTypesLen: " << argTypesLen << endl;
+        /*cerr << "argTypesLen: " << argTypesLen << endl;
         for(int i = 0; i < argTypesLen; ++i) {
           cerr << "argTypes: " << argTypes[i] << endl;
-        }
+        }*/
         length += argTypesLen; // length of function name + length of argTypes array
-        cerr << "msg length: " << length << endl;
+        //cerr << "msg length: " << length << endl;
         send(binderFD, &length, sizeof(length), 0);
 	
 	// Send type of request.
@@ -484,12 +479,12 @@ int rpcCall(char* name, int* argTypes, void** args) {
                   num = argTypes[argTypesLen];
                   argTypesLen ++;
                 }
-                cerr << "argTypesLen: " << argTypesLen << endl;
+                /*cerr << "argTypesLen: " << argTypesLen << endl;
                 for(int i = 0; i < argTypesLen; ++i) {
                   cerr << "argTypes: " << argTypes[i] << endl;
-                }
+                }*/
                 length += argTypesLen; // length of function name + length of argTypes array
-                cerr << "msg length: " << length << endl;
+                //cerr << "msg length: " << length << endl;
                 send(client_binderFD, &length, sizeof(length), 0);
 		
 		// Send type of request.
@@ -532,6 +527,9 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			
 			// Get the server's socket file descriptor.
 			int serverFD = connectToSocket(serverName, serverPort);
+                        if(serverFD < 0) {
+                          return CONNECT_SERVER_ERROR;
+                        }
 
                         //send length
                         send(serverFD, &length, sizeof(length), 0);
@@ -557,15 +555,15 @@ int rpcCall(char* name, int* argTypes, void** args) {
                           }
                           arg_size *= length;
                           send(serverFD, &arg_size, sizeof(arg_size), 0);
-                          cerr << "arg_size sent: " << arg_size << endl;
+                          //cerr << "arg_size sent: " << arg_size << endl;
                           
                           //send args
 			  send(serverFD, args[i], arg_size, 0);
-                          if(string(name) == "f0") {
+                          /*if(string(name) == "f0") {
                             printf("result in f0 before execution is: %d\n", *((int *)(args[0])));
                             printf("a0 in f0 before execution is: %d\n", *((int *)(args[1])));
                             printf("b0 in f0 before execution is: %d\n", *((int *)(args[2])));
-                          }
+                          }*/
 			} 
                         
 			// Receive the return value.
@@ -591,9 +589,9 @@ int rpcCall(char* name, int* argTypes, void** args) {
                               cerr << "Error: fail to receive argTypes part of execute success message" << endl;
                               //return -1;
                             }
-                            for(int i = 0; i < msg_len_int; ++i) {
+                            /*for(int i = 0; i < msg_len_int; ++i) {
                               cerr << "argTypes: " << argType[i] << endl;
-                            }
+                            }*/
 
                             //get args
                             int num_args = msg_len_int - 1; // the size of argTypes is 1 greater than the size of args
@@ -606,7 +604,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
                                  cerr << "Error: fail to receive size of arg" << endl;
                                  //return -1;
                               }
-                              cerr << "arg size: " << size_of_arg << endl;
+                              //cerr << "arg size: " << size_of_arg << endl;
 
                               //recv the arg
                               void *arg = operator new(size_of_arg);
@@ -618,7 +616,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
         
                                //put arg into args array
                                returned_args[i] = arg;
-                               cerr << "arg: " << &args[i] << endl;
+                               //cerr << "arg: " << &args[i] << endl;
                          }
                           cerr << "successfully receive execute success message" << endl;
 
@@ -642,8 +640,8 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			return exRetCode;
 		}
 		
-		if(retCode == LOC_FAILURE) {
-			cerr << "rpcCall location failure." << endl;
+		else if(retCode == LOC_FAILURE) {
+			//cerr << "rpcCall location failure." << endl;
                         close(client_binderFD);
 			return LOC_FAILURE;
 		}
@@ -667,8 +665,7 @@ int rpcExecute() {
     int listen_num = listen(listenFD, SOMAXCONN);
     if (listen_num != 0) {
         close(listenFD);
-        cerr << "Error: fail to listen to server" << endl;
-        return -1;
+        return LISTEN_CLIENTS_SOCKET_ERROR;
     }
     
     
@@ -700,7 +697,6 @@ int rpcExecute() {
         
         if(readsocks < 0) {
             cerr << "failed to select" << endl;
-            //return -1;
         }
         
         for(int i = 0; i < highsock + 1; ++i) {
@@ -726,23 +722,26 @@ int rpcExecute() {
                     //get message length (4 bytes)
                     int msg_len = getMsgLength(i);
                     if (msg_len == -1) {
-                        return -1;
+                        return MSG_LENGTH_ERROR;
                     }
-                    cerr << "msg_len: " << msg_len << endl;
+                    //cerr << "msg_len: " << msg_len << endl;
                     
                     //msg_len == 0 means client tries to end connection
                     if(msg_len == 0) {
                         FD_CLR(i, &rset);
                         close(i);
+                        if(i == binderFD) { // binder failure
+			  return CONNECT_BINDER_ERROR;
+                        }
                         continue;
                     }
                     
                     //get message type (4 bytes)
                     int msg_type = getMsgType(i);
                     if (msg_type == -1) {
-                        return -1;
+                        return GET_MSG_TYPE_ERROR;
                     }
-                    cerr << "msg_type: " << msg_type << endl;
+                    //cerr << "msg_type: " << msg_type << endl;
                     
                     switch (msg_type) {
                             case EXECUTE:
@@ -751,7 +750,9 @@ int rpcExecute() {
 							
                             case TERMINATE:
                               cerr << "received terminate message from binder" << endl;
-			      terminate = true;
+                              if(i == binderFD) { // make sure the termination request comes from binder
+			        terminate = true;
+                              }
 	                      break;
                     }
                 }
