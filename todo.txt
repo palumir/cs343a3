@@ -1,11 +1,7 @@
 TODO:
-1. multiple servers, multiple clients
+1. More tests (client, binder and server runs on differnt machines, same machines etc.)
 
-2. handle server/client failure
-
-3. More tests (client, binder and server runs on differnt machines, same machines etc.)
-
-3. Double check system manual and read me
+2. Double check system manual, make file and read me
 
 Done:
 1. makefile
@@ -28,6 +24,8 @@ Done:
 11.create more sample propgrams for testing
 12.function overloading
 13.multiple servers, 1 client
+14. multiple servers, multiple clients
+15. handle server/client failure
 
 Function being tested:
 1. rpcInit:      yes 
