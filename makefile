@@ -3,7 +3,9 @@ CXXFLAGS = -Wall -MMD -g -pthread
 EXEC1 = binder
 EXEC2 = client
 EXEC3 = server
-EXECUTABLE = client server binder librpc.a
+EXEC4 = client2
+EXEC5 = server2
+EXECUTABLE = client server binder librpc.a client2 server2
 
 all: ${EXECUTABLE}
 
@@ -18,6 +20,12 @@ ${EXEC2}: client1.o librpc.a
 
 ${EXEC3}: server_functions.o server_function_skels.o server.o librpc.a
 		${CXX} ${CXXFLAGS} -L. server_functions.o server_function_skels.o server.o -lrpc -o ${EXEC3}
+
+${EXEC4}: client2.o librpc.a
+		${CXX} ${CXXFLAGS} -L. client2.o -lrpc -o ${EXEC4}
+
+${EXEC5}: server_functions.o server_function_skels.o server2.o librpc.a
+		${CXX} ${CXXFLAGS} -L. server_functions.o server_function_skels.o server2.o -lrpc -o ${EXEC5}
 
 
 .PHONY: clean

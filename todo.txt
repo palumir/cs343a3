@@ -1,19 +1,7 @@
 TODO:
-1. create more sample propgrams for testing
+1. More tests (client, binder and server runs on differnt machines, same machines etc.)
 
-2. 1 server, multiple clients
-
-3. multiple servers, 1 client
-
-4. multiple servers, multiple clients
-
-5. round robin
-
-6. function overloading
-
-7. Memory Leak
-
-8.handle server/client failure
+2. Double check system manual, make file and read me
 
 Done:
 1. makefile
@@ -29,12 +17,19 @@ Done:
    These 3 data structures should be vector/map or other data structures instead  
    of hardcoded length array
 6. All functions returned correctly
-7. 2. 1 server, 1 client 
-
+7. 1 server, 1 client 
+8. Memory Leak
+9. 1 server, multiple clients
+10.round robin
+11.create more sample propgrams for testing
+12.function overloading
+13.multiple servers, 1 client
+14. multiple servers, multiple clients
+15. handle server/client failure
 
 Function being tested:
 1. rpcInit:      yes 
 2. rpcCall:      yes, cannot find any bugs so far
 3. rpcRegister:  yes, cannot find any bugs so far
-4. rpcExecute:   yes, cannot terminate after receiving TERMINATE MESSAGE from client
+4. rpcExecute:   yes, cannot find any bugs so far
 5. rpcTerminate: yes
