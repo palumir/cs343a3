@@ -76,12 +76,26 @@ int main() {
   args2[2] = (void *)&b2;
 
   /* prepare the arguments for f3 */
-  long a3[11] = {11, 109, 107, 105, 103, 101, 102, 104, 106, 108, 110};
+  long int length = 10000;
+  //long a3[12] = {12, 109, 107, 105, 103, 101, 102, 104, 106, 108, 110, 99};
+  /*long a3[51] = {length, 109, 107, 105, 103, 101, 102, 104, 106, 108, 110,
+                         109, 107, 105, 103, 101, 102, 104, 106, 108, 110,
+                         109, 107, 105, 103, 101, 102, 104, 106, 108, 110,
+                         109, 107, 105, 103, 101, 102, 104, 106, 108, 110,
+                         109, 107, 105, 103, 101, 102, 104, 106, 108, 110};*/
+  long a3[length];
+  a3[0] = length;
+  long int counter = 1;
+  while (counter < length) {
+    a3[counter] = counter;
+    counter ++;
+  }
+  
   int count3 = 1;
   int argTypes3[count3 + 1];
   void **args3;
 
-  argTypes3[0] = (1 << ARG_OUTPUT) | (1 << ARG_INPUT) | (ARG_LONG << 16) | 11;
+  argTypes3[0] = (1 << ARG_OUTPUT) | (1 << ARG_INPUT) | (ARG_LONG << 16) | length;
   argTypes3[1] = 0;
 
   args3 = (void **)malloc(count3 * sizeof(void *));
@@ -142,7 +156,10 @@ int main() {
   if (s3 >= 0) {
     printf("ACTUAL return of f3 is: ");
     int i;
-    for (i = 0; i < 11; i++) {
+    /*for (i = 0; i < 11; i++) {
+      printf(" %ld", *(((long *)args3[0]) + i));
+    }*/
+    for (i = 0; i < length; i++) {
       printf(" %ld", *(((long *)args3[0]) + i));
     }
     printf("\n");

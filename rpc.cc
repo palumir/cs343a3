@@ -167,6 +167,7 @@ class argStruct {
 	public:
 	int functionNumber;
 	void **args;
+        int* argsLength;
 	int socketfd;
 };
 
@@ -203,23 +204,30 @@ void * runFunction(void *threadArg) {
                 }
                 //cerr << "argTypesLen after execution: " << argTypesLen << endl;
                 send(castArgs->socketfd, argTypesList[castArgs->functionNumber], argTypesLen * 4, 0);
-                //cerr << "argTypesLen after execution: " << argTypesLen << endl;
+                cerr << "argTypesLen after execution: " << argTypesLen << endl;
 
                 // Send args (one by one)
                 for(int i = 0; i < argTypesLen - 1; ++i) {
                   //send size of args
                   int temp = (argTypesList[castArgs->functionNumber][i] >> 16) & 15;
                   int arg_size = get_arg_size(temp);
-                  int length = argTypesList[castArgs->functionNumber][i] & ((1 << 16) - 1);// array or scalar
+                  cerr << "arg_size at thread: " << arg_size << endl;
+                  int length = castArgs->argsLength[i];
                   if(length == 0) {
                     length = 1;
                   }
                   arg_size *= length;
                   send(castArgs->socketfd, &arg_size, sizeof(arg_size), 0);
-                  //cerr << "arg_size sent after execution: " << arg_size << endl;
+                  cerr << "length at thread: " << length << endl;
+                  cerr << "arg_size sent after execution: " << arg_size << endl;
                           
                   //send args
 		  send(castArgs->socketfd, castArgs->args[i], arg_size, 0);
+                  if((string)functionName == "f3") {
+                    for(int j = 0; j < 12; ++j) {
+                      printf("f3 at server after execution is: %ld\n", *((long int *)(castArgs->args[0]) + j));
+                    }
+                  }
                   //cerr << "args after execution: " << &castArgs->args[i] << endl;
 	        }       
                 
@@ -228,7 +236,8 @@ void * runFunction(void *threadArg) {
 		int exFail = EXECUTE_FAILURE;
 		send(castArgs->socketfd, &exFail, sizeof(int), 0);
 	}
-	
+    
+    numThreads --;	
     return 0;
 }
 
@@ -242,7 +251,7 @@ void handle_execute_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive name part of execute message" << endl;
         //return -1;
     }
-    cerr << "client calls funtion: " << function_name << endl;
+    //cerr << "client calls funtion: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
@@ -259,7 +268,21 @@ void handle_execute_request(int socketfd, int msg_len) {
     //get args
     int num_args = msg_len_int - 1; // the size of argTypes is 1 greater than the size of args
     void** args = new void*[num_args];
+    int* argLength = new int[num_args];
+    int* argSizeArray = new int[num_args];
     for (int i = 0; i < num_args; ++i) {
+        //recv the length of the arg
+        int length_of_arg;
+        int recv_length_arg = recv(socketfd, &length_of_arg, sizeof(length_of_arg), 0);
+        if(recv_length_arg < 0) {
+            cerr << "Error: fail to receive length of arg" << endl;
+            //return -1;
+        }
+
+        //put it in length array;
+        argLength[i] = length_of_arg;
+        cerr << "argLength: " << argLength[i] << endl;
+
         //recv the size of the arg
         int size_of_arg;
         int recv_size_arg = recv(socketfd, &size_of_arg, sizeof(size_of_arg), 0);
@@ -268,20 +291,32 @@ void handle_execute_request(int socketfd, int msg_len) {
             //return -1;
         }
         //cerr << "arg size: " << size_of_arg << endl;
+        
+        //put it in args size array
+        argSizeArray[i] = size_of_arg;
 
         //recv the arg
-        void *arg = operator new(size_of_arg);
+        //void *arg = operator new(size_of_arg);
+        char *arg = new char[size_of_arg];
         int recv_arg = recv(socketfd, arg, size_of_arg, 0);
         if(recv_arg < 0) {
             cerr << "Error: fail to receive arg" << endl;
             //return -1;
         }
+        cerr << "size of arg: " << size_of_arg << endl;
         
         //put arg into args array
-        args[i] = arg;
-        /*if(string(function_name) == "f0") {
-          printf("result, a0 or b0 in f0 at server before execution is: %d\n", *((int *)(args[i])));
-       }*/
+        args[i] = new char[size_of_arg];
+        //memset(args[i], 0, size_of_arg);
+        for(int j = 0; j < length_of_arg; ++j) {
+          memcpy((char *)args[i][j], arg[j], sizeof(char));
+        }
+        //memcpy(args[i], arg, size_of_arg);
+        if(string(function_name) == "f3") {
+          for(int j = 0; j < length_of_arg; ++j) {
+            printf("f3 at server before execution is: %ld\n", *((long int *)(args[0]) + j));
+          }
+       }
     }
     //cerr << "successfully receive function message from client" << endl;
 	
@@ -310,20 +345,29 @@ void handle_execute_request(int socketfd, int msg_len) {
 
 	// Found the function, execute it in a new pthread.
 	if(foundFunction != -1) {
+                int total_size = 0;
 		pthread_t runThread;
 		//argStruct *threadArgs = new argStruct();
                 argStruct threadArgs;
 		threadArgs.functionNumber = foundFunction;
 		threadArgs.args = new void*[num_args];
+                threadArgs.argsLength = new int[num_args];
                 for (int i = 0; i < num_args; ++i) {
-                  threadArgs.args[i] = args[i];
-                }              
+                  total_size += argLength[i];
+                  //threadArgs.args[i] = args[i];
+                  threadArgs.argsLength[i] = argLength[i];
+                  /*for(int j = 0; j < threadArgs.argsLength[i]; ++j) {
+                    
+                  }*/
+                }
+                memcpy(&threadArgs.args, &args, total_size);              
                 /*if(string(function_name) == "f0") {
                   printf("a0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[1])));
                   printf("b0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[2])));
                 }*/
 		threadArgs.socketfd = socketfd;
 		pthread_create(&runThread, NULL, &runFunction, (void*)&threadArgs);
+                numThreads ++;
 	}
         //delete(argType);
         //delete(args);
@@ -422,14 +466,14 @@ int rpcRegister(char* name, int* argTypes, skeleton f) {
 		argTypesList.push_back(argTypes);
 		functionNames.push_back(name);
                
-                cerr << "REGISTER_SUCCESS: " << name << endl;
+                //cerr << "REGISTER_SUCCESS: " << name << endl;
 		return REGISTER_SUCCESS;
 	}
 	
 	// Do nothing, it's already registered.
 	else if(retCode == DUPLICATE_REGISTER) {
 
-                cerr << "DUPLICATE_REGISTER: " << name << endl;
+                //cerr << "DUPLICATE_REGISTER: " << name << endl;
 		return DUPLICATE_REGISTER;
 	}
 	
@@ -546,24 +590,28 @@ int rpcCall(char* name, int* argTypes, void** args) {
 			
 			// Send args (one by one)
                         for(int i = 0; i < argTypesLen - 1; ++i) {
-                          //send size of args
-                          int temp = (argTypes[i] >> 16) & 15;
-                          int arg_size = get_arg_size(temp);
+                          //send length of args
                           int length = argTypes[i] & ((1 << 16) - 1);// array or scalar
+                          cerr << "length: " << length << endl; 
                           if(length == 0) {
                             length = 1;
                           }
+                          send(serverFD, &length, sizeof(length), 0);
+
+                          //send size of args
+                          int temp = (argTypes[i] >> 16) & 15;
+                          int arg_size = get_arg_size(temp);
+                          cerr << "arg_sizet: " << arg_size << endl;
+                          
                           arg_size *= length;
                           send(serverFD, &arg_size, sizeof(arg_size), 0);
-                          //cerr << "arg_size sent: " << arg_size << endl;
+                          cerr << "arg_size sent: " << arg_size << endl;
                           
                           //send args
 			  send(serverFD, args[i], arg_size, 0);
-                          /*if(string(name) == "f0") {
-                            printf("result in f0 before execution is: %d\n", *((int *)(args[0])));
-                            printf("a0 in f0 before execution is: %d\n", *((int *)(args[1])));
-                            printf("b0 in f0 before execution is: %d\n", *((int *)(args[2])));
-                          }*/
+                          if(string(name) == "f3") {
+                            printf("f3 before execution is: %ld\n", *((long int *)(args[i])));
+                          }
 			} 
                         
 			// Receive the return value.
@@ -579,7 +627,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
                               cerr << "Error: fail to receive name part of execute success message" << endl;
                               //return -1;
                             }
-                            cerr << "funtion is executed: " << function_name << endl;
+                            //cerr << "funtion is executed: " << function_name << endl;
     
                             //get argTypes
                             int msg_len_int = argTypesLen;
@@ -616,9 +664,14 @@ int rpcCall(char* name, int* argTypes, void** args) {
         
                                //put arg into args array
                                returned_args[i] = arg;
+                               if((string)function_name == "f3") {
+                                 for(int j = 0; j < 12; ++j) {
+                                   printf("f3 at server after execution is: %ld\n", *((long int *)(returned_args[0]) + j));
+                                 }
+                               }
                                //cerr << "arg: " << &args[i] << endl;
                          }
-                          cerr << "successfully receive execute success message" << endl;
+                          //cerr << "successfully receive execute success message" << endl;
 
                           //record the result
                           for(int i = 0; i < num_args; ++i) {
@@ -629,7 +682,7 @@ int rpcCall(char* name, int* argTypes, void** args) {
                           delete(returned_args);
                         }
                         else if (exRetCode == EXECUTE_FAILURE) {
-                          cerr << "rpcCall execute failure." << endl;
+                          //cerr << "rpcCall execute failure." << endl;
                         }
 			
                         //Johnson: close connection when done
@@ -710,7 +763,7 @@ int rpcExecute() {
                         cerr << "failed to accept connection from server" << endl;
                     }
                     
-                    cerr << "connected to client" << endl;
+                    //cerr << "connected to client" << endl;
                     //update the descriptor sets
                     FD_SET(connectionfd, &rset);
                     if(connectionfd > highsock) {
@@ -749,7 +802,8 @@ int rpcExecute() {
                               break;
 							
                             case TERMINATE:
-                              cerr << "received terminate message from binder" << endl;
+                              //cerr << "received terminate message from binder" << endl;
+                              while(numThreads != 0) {}
                               if(i == binderFD) { // make sure the termination request comes from binder
 			        terminate = true;
                               }
