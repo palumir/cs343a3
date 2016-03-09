@@ -51,10 +51,6 @@ int getMsgLength(int socketfd) {
       cerr << "Error: fail to receive message length" << endl;
       return -1;
     }
-    //cout << "get mssage length: " << req_msg[0] + req_msg[1] + req_msg[2] + req_msg[3] << endl;
-    
-    
-    //msg_len = (msg_length[0] << 24) + (msg_length[1] << 16) + (msg_length[2] << 8) + msg_length[3];
     
     return msg_len;
 }
@@ -67,10 +63,6 @@ int getMsgType(int socketfd) {
         cerr << "Error: fail to receive message type" << endl;
         return -1;
     }
-    //cout << "get mssage length: " << req_msg[0] + req_msg[1] + req_msg[2] + req_msg[3] << endl;
-    
-    
-    //msg_type = (msg_type_char[0] << 24) + (msg_type_char[1] << 16) + (msg_type_char[2] << 8) + msg_type_char[3];
     
     return msg_type;
 }
@@ -104,7 +96,6 @@ bool sameArgTypes(int a, int b) {
 
 void handle_loc_request(int socketfd, int msg_len) {
     //LOC_REQUEST, name, argTypes
-    cerr << "handle_loc_request" << endl;
     
     //get function name
     char function_name[NAME_LENGTH];
@@ -113,7 +104,6 @@ void handle_loc_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive name part of loc_requst message" << endl;
         //return -1;
     }
-    cerr << "client calls funtion: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
@@ -123,9 +113,6 @@ void handle_loc_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive argTypes part of loc_requst message" << endl;
         //return -1;
     }
-    /*for(int i = 0; i < msg_len_int; ++i) {
-      cerr << "received argTypes from client: " << argType[i] << endl;
-    }*/
     
     
     //search at the database with function name and argTypes
@@ -155,8 +142,6 @@ void handle_loc_request(int socketfd, int msg_len) {
                         server_info temp;
                         temp.server_name = it->first.server_name;
                         temp.port_num = it->first.port_num;
-                        //cerr << "server: " << temp.server_name << " is valid" << endl;
-                        //cerr << "the port_num is: " << temp.port_num << endl;
                         all_valid_server.push_back(temp);
                         found = true;
                     }
@@ -168,20 +153,15 @@ void handle_loc_request(int socketfd, int msg_len) {
     bool finished_round_robin = false;
     server_info temp_server;
     if (found) {
-        //cerr << "found function that client calls in database" << endl;
         //loop through the list of servers from the beginning to see if the server is at the list of valid server
         //If it owns the function, send the location to client and move it to the back of the list for scheduling and return
         for(vector<server_info>::iterator it = all_servers.begin();
             it != all_servers.end(); ++it) {
-            //cerr << "server in the database: " << it->server_name << "   port_num: " << it->port_num << endl;
             for (vector<server_info>::iterator i = all_valid_server.begin();
                  i != all_valid_server.end(); ++i) {
                 string v_server = i->server_name;
                 int v_port = i->port_num;
-                //cerr << "server_name in database: " << it->server_name << endl;
-                //cerr << "valid_server: " << v_server << endl;
                 if (it->server_name == v_server && it->port_num == v_port) {
-                  //cerr << "valid_server: " << v_server << "   port_num: " << v_port << endl;
                   server_name_result = it->server_name;
                   server_port_result = it->port_num;
                
@@ -214,18 +194,6 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_success_message < 0) {
             cerr << "Error: fail to send success message when handle the loc_req message" << endl;
         }
-        //cerr << "LOC_SUCCESS sent" << endl;
-
-        
-        /*send server_name
-        char server_name[HOSTNAME_LENGTH];
-        strcpy(server_name, server_name_result.c_str());
-        server_name[HOSTNAME_LENGTH - 1] = '\0';
-        int send_server_name = send(socketfd, server_name, HOSTNAME_LENGTH, 0);
-        if (send_server_name < 0) {
-            cerr << "Error: fail to send the server name when handle the loc_req message" << endl;
-        }
-        cerr << "server_name sent: " << server_name << endl;*/
         
         //send port_num
         int port = server_port_result;
@@ -233,7 +201,6 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_port_num < 0) {
             cerr << "Error: fail to send the port num when handle the loc_req message" << endl;
         }
-        cerr << "port_num sent: " << port << endl;
 
         //send server_name
         char server_name[HOSTNAME_LENGTH];
@@ -243,7 +210,6 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_server_name < 0) {
             cerr << "Error: fail to send the server name when handle the loc_req message" << endl;
         }
-        cerr << "server_name sent: " << server_name << endl;
     }
     else {
         //send failure message
@@ -252,14 +218,12 @@ void handle_loc_request(int socketfd, int msg_len) {
         if (send_failure_message < 0) {
             cerr << "Error: fail to send the failure message when handle the loc_req message" << endl;
         }
-        //cerr << "LOC_FAILURE sent" << endl;
     }
     delete[] argType;
 }
 
 void handle_register_request(int socketfd, int msg_len) {
     //REGISTER, server_identifier, port, name, argTypes
-    //cerr << "handle_register_request" << endl;
     
     //get server_identifier
     char server_identifier[HOSTNAME_LENGTH];
@@ -268,18 +232,15 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive server identifier of reg_requst message" << endl;
         //return -1;
     }
-    cerr << "received server identifier at handle_register_request: " << server_identifier << endl;
 
     
     //get port
-    //char port[PORT_LENGTH];
     int port;
     int recv_port_num = recv(socketfd, &port, PORT_LENGTH, 0);
     if(recv_port_num < 0) {
         cerr << "Error: fail to receive port number of reg_requst message" << endl;
         //return -1;
     }
-    cerr << "received port at handle_register_request: " << port << endl;
     
     //get function name
     char function_name[NAME_LENGTH];
@@ -288,7 +249,6 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive function name of reg_requst message" << endl;
         //return -1;
     }
-    cerr << "received function_name at handle_register_request: " << function_name << endl;
     
     //get argTypes
     int msg_len_int = msg_len - NAME_LENGTH;
@@ -298,9 +258,6 @@ void handle_register_request(int socketfd, int msg_len) {
         cerr << "Error: fail to receive argTypes part of reg_requst message" << endl;
         //return -1;
     }
-    /*for(int i = 0; i < msg_len_int; ++i) {
-      cerr << "received argTypes: " << argType[i] << endl;
-    }*/
     
     //check whether the server or function is in database
     server_info server_location;
@@ -310,7 +267,6 @@ void handle_register_request(int socketfd, int msg_len) {
          it != binder_database.end(); ++it) {
         //found server
         if(it->first.server_name == string(server_identifier) && it->first.port_num == port) {
-            //cerr << "found server at the database" << endl;
             server_exist = true;
             server_location.server_socket = it->first.server_socket;
             server_location.server_name = it->first.server_name;
@@ -323,7 +279,6 @@ void handle_register_request(int socketfd, int msg_len) {
                 //compare function name
                 string function_name_temp = i->function_name;
                 if (function_name_temp == string(function_name)) {
-                    cerr << "found the function at the database" << endl;
                     //compare args
                     int totalArgs = i->numArgs;
                     for(int j = 0; j < totalArgs; ++j) {
@@ -370,13 +325,11 @@ void handle_register_request(int socketfd, int msg_len) {
 
       for(int i = 0; i < msg_len_int; ++i) {
         ftn.argTypes[i] = argType[i];
-        //cerr << "argTypes in database: " << ftn.argTypes[i] << endl;
       }
 
       //add function to database
       binder_database[server_location].push_back(ftn);
         
-      //delete[] ftn.argTypes;
     }
     
     
@@ -398,7 +351,6 @@ void handle_register_request(int socketfd, int msg_len) {
                           break;
                       }
                       else if (j == ftn.numArgs - 1) {
-                          cerr << "successfuly register the whole ftn" << endl;
                           success = true;
                       }
                   }
@@ -430,7 +382,6 @@ void handle_register_request(int socketfd, int msg_len) {
 
 void handle_terminate_request(int socketfd) {
     //TERMINATE
-    //cerr << "handle_terminate_request" << endl;
     
     //get binder's name
     char hostname[HOSTNAME_LENGTH];
@@ -440,7 +391,6 @@ void handle_terminate_request(int socketfd) {
     //inform all the servers to shut down
     for (vector<int>::iterator i = servers_socket.begin();
          i != servers_socket.end(); ++i) {
-         //cerr << "sending terminate_request message to all servers" << endl;
          int socket_end = *i;
          //send length
          int length = 1;
@@ -490,7 +440,6 @@ int main(int argc, const char* argv[]) {
     struct sockaddr_in sin;
     socklen_t len = sizeof(sin);
     if (getsockname(socketfd, (struct sockaddr *)&sin, &len) == -1) {
-      cerr << "err: unable to get binder port" << endl;
       return BINDER_PORT_ERROR;
     }
     else {
@@ -531,7 +480,6 @@ int main(int argc, const char* argv[]) {
               cerr << "failed to accept connection" << endl;
             }
                     
-            //cerr << "connected" << endl;
             //update the descriptor sets
             FD_SET(connectionfd, &rset);
             if(connectionfd > highsock) {
@@ -545,11 +493,9 @@ int main(int argc, const char* argv[]) {
             if (msg_len == -1) {
                 return MSG_LENGTH_ERROR;
             }
-            //cerr << "msg_len: " << msg_len << endl;
               
             //msg_len == 0 means server tries to end connection
             if(msg_len == 0) {
-              cerr << "closing connection" << endl;
               FD_CLR(i, &rset);
               close(i);
                 
@@ -603,12 +549,10 @@ int main(int argc, const char* argv[]) {
             int msg_type = getMsgType(i);
             if (msg_type == -1) {
               return GET_MSG_TYPE_ERROR;
-            }
-            //cerr << "msg_type: " << msg_type << endl;              
+            }             
 
             switch (msg_type) {
                 case LOC_REQUEST:
-                //cerr << "LOC_REQUEST" << endl;
                 handle_loc_request(i, msg_len);
                 break;
                       
