@@ -269,7 +269,7 @@ void handle_execute_request(int socketfd, int msg_len) {
     int num_args = msg_len_int - 1; // the size of argTypes is 1 greater than the size of args
     void** args = new void*[num_args];
     int* argLength = new int[num_args];
-    int* argSizeArray = new int[num_args];
+    //int* argSizeArray = new int[num_args];
     for (int i = 0; i < num_args; ++i) {
         //recv the length of the arg
         int length_of_arg;
@@ -293,25 +293,35 @@ void handle_execute_request(int socketfd, int msg_len) {
         //cerr << "arg size: " << size_of_arg << endl;
         
         //put it in args size array
-        argSizeArray[i] = size_of_arg;
+        //argSizeArray[i] = size_of_arg;
 
         //recv the arg
-        //void *arg = operator new(size_of_arg);
         char *arg = new char[size_of_arg];
-        int recv_arg = recv(socketfd, arg, size_of_arg, 0);
-        if(recv_arg < 0) {
-            cerr << "Error: fail to receive arg" << endl;
-            //return -1;
+        int counter = size_of_arg;
+        int upto = 0;
+        while(counter > 0) {
+          char *buffer = new char[size_of_arg];
+          int recv_num = recv(socketfd, buffer, size_of_arg, 0);
+          cout << "recv_num: " << recv_num << endl;
+          if(recv_num < 0) {
+            cerr << "Error: fail to receive string from client" << endl;
+                   //return -1;
+          }
+          counter -= recv_num;
+                 
+          int i = 0;
+          for (int k = upto; k < recv_num + upto; ++k) {
+              arg[k] = buffer[i];
+              //cout << "msg[" << k << "]: " << msg[k] << endl;
+              i ++;
+          }
+          upto += recv_num;
+          delete(buffer);
         }
-        cerr << "size of arg: " << size_of_arg << endl;
         
-        //put arg into args array
-        args[i] = new char[size_of_arg];
-        //memset(args[i], 0, size_of_arg);
-        for(int j = 0; j < length_of_arg; ++j) {
-          memcpy((char *)args[i][j], arg[j], sizeof(char));
-        }
-        //memcpy(args[i], arg, size_of_arg);
+        //put it in args array
+        args[i] = (void *)arg;
+
         if(string(function_name) == "f3") {
           for(int j = 0; j < length_of_arg; ++j) {
             printf("f3 at server before execution is: %ld\n", *((long int *)(args[0]) + j));
@@ -345,7 +355,7 @@ void handle_execute_request(int socketfd, int msg_len) {
 
 	// Found the function, execute it in a new pthread.
 	if(foundFunction != -1) {
-                int total_size = 0;
+                //int total_size = 0;
 		pthread_t runThread;
 		//argStruct *threadArgs = new argStruct();
                 argStruct threadArgs;
@@ -353,14 +363,14 @@ void handle_execute_request(int socketfd, int msg_len) {
 		threadArgs.args = new void*[num_args];
                 threadArgs.argsLength = new int[num_args];
                 for (int i = 0; i < num_args; ++i) {
-                  total_size += argLength[i];
-                  //threadArgs.args[i] = args[i];
+                  //total_size += argLength[i];
+                  threadArgs.args[i] = args[i];
                   threadArgs.argsLength[i] = argLength[i];
                   /*for(int j = 0; j < threadArgs.argsLength[i]; ++j) {
                     
                   }*/
                 }
-                memcpy(&threadArgs.args, &args, total_size);              
+                //memcpy(&threadArgs.args, &args, total_size);              
                 /*if(string(function_name) == "f0") {
                   printf("a0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[1])));
                   printf("b0 in f0 at thread before execution is: %d\n", *((int *)(threadArgs.args[2])));
@@ -655,11 +665,27 @@ int rpcCall(char* name, int* argTypes, void** args) {
                               //cerr << "arg size: " << size_of_arg << endl;
 
                               //recv the arg
-                              void *arg = operator new(size_of_arg);
-                              int recv_arg = recv(serverFD, arg, size_of_arg, 0);
-                              if(recv_arg < 0) {
-                                 cerr << "Error: fail to receive arg" << endl;
-                                  //return -1;
+                              char *arg = new char[size_of_arg];
+                              int counter = size_of_arg;
+                              int upto = 0;
+                              while(counter > 0) {
+                                 char *buffer = new char[size_of_arg];
+                                 int recv_num = recv(serverFD, buffer, size_of_arg, 0);
+                                 cout << "recv_num: " << recv_num << endl;
+                                 if(recv_num < 0) {
+                                    cerr << "Error: fail to receive string from client" << endl;
+                                     //return -1;
+                                 }
+                                 counter -= recv_num;
+                 
+                                 int i = 0;
+                                 for (int k = upto; k < recv_num + upto; ++k) {
+                                   arg[k] = buffer[i];
+                                   //cout << "msg[" << k << "]: " << msg[k] << endl;
+                                   i ++;
+                                 }
+                                 upto += recv_num;
+                                 delete(buffer);
                                }
         
                                //put arg into args array
